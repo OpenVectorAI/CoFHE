@@ -1,0 +1,8 @@
+add_library(CoFHE INTERFACE "./cofhe.hpp")
+target_include_directories(CoFHE INTERFACE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(CoFHE INTERFACE ${CMAKE_SOURCE_DIR}/thirdparty/json/include)
+target_link_libraries(CoFHE INTERFACE gmp::gmp OpenSSL::SSL)
+install(TARGETS CoFHE DESTINATION lib)
+if (CPU_X86_64)
+    target_link_libraries(CoFHE INTERFACE bicycl)
+endif()
