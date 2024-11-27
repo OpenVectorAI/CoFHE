@@ -14,7 +14,7 @@
 #include "node/partial_decryption_request_handler.hpp"
 #include "node/network_details_request_handler.hpp"
 
-#define CACHE_SIZE  10000 //100000000
+#define CACHE_SIZE  10000000
 
 namespace CoFHE
 {
@@ -93,19 +93,18 @@ namespace CoFHE
                     triplets.at(i - beavers_triplets_index_m, 1) = beavers_triplets_m[i][1];
                     triplets.at(i - beavers_triplets_index_m, 2) = beavers_triplets_m[i][2];
                 }
-                size_t curr_req = 0;
                 auto res_ = crypto_system_m.deserialize_ciphertext_tensor(BeaversTripletResponse::from_string(res->data()).data());
+                size_t curr_req =  beavers_triplets_m.size() - beavers_triplets_index_m;
                 CoFHE_PARALLEL_FOR_STATIC_SCHEDULE
-                for (size_t i = beavers_triplets_m.size() - beavers_triplets_index_m; i < size; i++)
+                for (size_t i = 0; i < size-curr_req; i++)
                 {
-                    triplets.at(i, 0) = res_.at(curr_req, 0);
-                    triplets.at(i, 1) = res_.at(curr_req, 1);
-                    triplets.at(i, 2) = res_.at(curr_req, 2);
-                    curr_req++;
+                    triplets.at(i+curr_req, 0) = res_.at(i, 0);
+                    triplets.at(i+curr_req, 1) = res_.at(i, 1);
+                    triplets.at(i+curr_req, 2) = res_.at(i, 2);
                 }
                 beavers_triplets_index_m = 0;
                 beavers_triplets_m.clear();
-                for (size_t i = curr_req; i < res_.size(); i++)
+                for (size_t i = size-curr_req; i < res_.size(); i++)
                 {
                     beavers_triplets_m.push_back({res_.at(i, 0), res_.at(i, 1), res_.at(i, 2)});
                 }
