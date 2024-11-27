@@ -69,7 +69,6 @@ namespace CoFHE
                             // the data can contain more data than the header specifies
                             // so in next call read the remaining data
                             auto header_str = read_buffer.substr(0, bytes_transferred);
-                            std::cout<<header_str<<std::endl;
                             if (read_buffer.size() > bytes_transferred)
                             {
                                 read_buffer = read_buffer.substr(bytes_transferred);

@@ -30,7 +30,7 @@ int main(int argc, char const *argv[])
         CryptoSystemDetails cs_details{
             CryptoSystemType::CoFHE_CPU,
             "public_key",
-            32,
+            128,
             64,
             2,
             3};
@@ -58,35 +58,37 @@ int main(int argc, char const *argv[])
         auto client_node = make_client_node<CPUCryptoSystem>(setup_node_details);
         auto cs = client_node.crypto_system();
         // ComputeRequest req(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::ADD, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::SINGLE, ComputeRequest::DataEncrytionType::PLAINTEXT, cs.serialize_plaintext(cs.make_plaintext(230))), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::SINGLE, ComputeRequest::DataEncrytionType::PLAINTEXT, cs.serialize_plaintext(cs.make_plaintext(20)))}));
-        // ComputeRequest req(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::MULTIPLY, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::SINGLE, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext(cs.encrypt(client_node.network_public_key(), cs.make_plaintext(230)))), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::SINGLE, ComputeRequest::DataEncrytionType::PLAINTEXT, cs.serialize_plaintext(cs.make_plaintext(20)))}));
+        // ComputeRequest req(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::MULTIPLY, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::SINGLE, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext(cs.encrypt(client_node.network_public_key(), cs.make_plaintext(230)))), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::SINGLE, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext(cs.encrypt(client_node.network_public_key(), cs.make_plaintext(20))))}));
         size_t n=8,m=8,p=8;
-        Tensor<CPUCryptoSystem::CipherText *> ct1(n,m, nullptr);
-        ct1.flatten();
-        int i=1;
-        auto init = [&i,&cs, &client_node](CPUCryptoSystem::CipherText*& ct) noexcept{
-            ct = new CPUCryptoSystem::CipherText(cs.encrypt(client_node.network_public_key(), cs.make_plaintext(i++)));
-        };
-        ct1.walk(init);
-        Tensor<CPUCryptoSystem::CipherText *> ct2(m,p, nullptr);
-        ct2.flatten();
-        i=1;
-        auto init2 = [&i,&cs, &client_node](CPUCryptoSystem::CipherText*& ct) noexcept{
-            ct = new CPUCryptoSystem::CipherText(cs.encrypt(client_node.network_public_key(), cs.make_plaintext(i++)));
-        };
-        ct2.walk(init2);
-        ct1.reshape({n,m});
-        ct2.reshape({m,p});
+        Tensor<CPUCryptoSystem::PlainText*> pt1(n,m,nullptr),pt2(m,p,nullptr);
+        pt1.flatten();
+        pt2.flatten();
+        for (size_t i = 0; i < n*m; i++)
+        {
+            pt1.at(i) = new CPUCryptoSystem::PlainText{cs.make_plaintext(i)};
+        }
+        for (size_t i = 0; i < m*p; i++)
+        {
+            pt2.at(i) = new CPUCryptoSystem::PlainText{cs.make_plaintext(i)};
+        }
+        pt1.reshape({n,m});
+        pt2.reshape({m,p});
+        auto ct1 = cs.encrypt_tensor(client_node.network_public_key(), pt1);
+        auto ct2 = cs.encrypt_tensor(client_node.network_public_key(), pt2);
         auto start = std::chrono::high_resolution_clock::now();
         ComputeRequest req(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::MULTIPLY, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(ct1)), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(ct2))}));
         ComputeResponse *res;
         client_node.compute(req, &res);
         auto stop = std::chrono::high_resolution_clock::now();
-        std::cout << res->data() << std::endl;
         // ComputeRequest req_d(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::UNARY, ComputeRequest::ComputeOperation::DECRYPT, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::SINGLE, ComputeRequest::DataEncrytionType::CIPHERTEXT, res->data())}));
         ComputeRequest req_d(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::UNARY, ComputeRequest::ComputeOperation::DECRYPT, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, res->data())}));
         client_node.compute(req_d, &res);
         auto stop_d = std::chrono::high_resolution_clock::now();
-        std::cout << res->data() << std::endl;
+        auto print = [&cs](CPUCryptoSystem::PlainText*& pt) noexcept{
+            std::cout << *pt << " ";
+        };
+        cs.deserialize_plaintext_tensor(res->data()).walk(print);
+        // std::cout<<cs.get_float_from_plaintext(cs.deserialize_plaintext(res->data()))<<std::endl;
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
         auto duration_d = std::chrono::duration_cast<std::chrono::microseconds>(stop_d - stop);
         std::cout << "Time taken by function mul: "

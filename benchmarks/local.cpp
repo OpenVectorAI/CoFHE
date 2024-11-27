@@ -5,12 +5,10 @@
 
 using namespace CoFHE;
 
-#define ENC_BATCH_SIZE 100
-
 
 auto get_crypto_system()
 {
-    return make_cryptosystem(32, 32, Device::CPU);
+    return make_cryptosystem(128, 128, Device::CPU);
 }
 
 template <typename CryptoSystem>
@@ -21,41 +19,46 @@ auto get_keys(CryptoSystem &cs)
     return std::make_pair(sk, pk);
 }
 
-auto get_plaintext_vector(auto &cs, size_t n)
-{
-    std::vector<decltype(cs.make_plaintext(0.0f))> pt;
-    for (size_t i = 0; i < n; i++)
-    {
-        pt.push_back(cs.make_plaintext(0.0f));
-    }
-    return pt;
-}
-
 void benchmark_encrypt_decrypt()
 {
     auto cs = get_crypto_system();
     auto [sk, pk] = get_keys(cs);
-    auto pts = get_plaintext_vector(cs, ENC_BATCH_SIZE);
-    auto encrypter = [&cs, &pk, &pts]()
+    // std::vector<size_t> n = {8, 16, 32, 64, 128, 256, 512, 1024};
+    // std::vector<size_t> m = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
+    std::vector<size_t> n = {64};
+    std::vector<size_t> m = {64};
+    Benchmark b("encrypt_decrypt");
+    for (auto ni : n)
     {
-        for (auto pt : pts)
+        for (auto mi : m)
         {
-            cs.encrypt(pk, pt);
+            Tensor<CPUCryptoSystem::PlainText *> pts(ni, mi, nullptr);
+            for (size_t i = 0; i < ni * mi; i++)
+            {
+                pts.at(i) = new CPUCryptoSystem::PlainText(cs.make_plaintext(i + 1));
+            }
+            pts.reshape({ni, mi});
+            auto encrypt_decrypt = [&cs, &pk, &pts, &sk]()
+            {
+                auto ct = cs.encrypt_tensor(pk, pts);
+                auto res = cs.decrypt_tensor(sk, ct);
+                ct.flatten();
+                res.flatten();
+                for (size_t i = 0; i < ct.num_elements(); i++)
+                {
+                    delete res.at(i);
+                    delete ct.at(i);
+                }
+            };
+            b.run(encrypt_decrypt,1);
+            pts.flatten();
+            for (size_t i = 0; i < ni * mi; i++)
+            {
+                delete pts.at(i);
+            }
+            std::cout << "n: " << ni << " m: " << mi << std::endl;
         }
-    };
-    auto decrypter = [&cs, &sk, &pk, &pts]()
-    {
-        for (auto pt : pts)
-        {
-            auto ct = cs.encrypt(pk, pt);
-            cs.decrypt(sk, ct);
-        }
-    };
-    Benchmark b("encrypt_decrypt 1000");
-    b.run(encrypter, 1000);
-    b.print_summary();
-    b.reset();
-    b.run(decrypter, 1000);
+    }
     b.print_summary();
 }
 
@@ -67,9 +70,9 @@ void benchmark_ciphertext_matadd()
     // std::vector<size_t> n = {8, 16, 32, 64, 128, 256, 512, 1024};
     // std::vector<size_t> m = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
     // std::vector<size_t> p = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
-    std::vector<size_t> n = {768};
-    std::vector<size_t> m = {768};
-    std::vector<size_t> p = {768};
+    std::vector<size_t> n = {64};
+    std::vector<size_t> m = {64};
+    std::vector<size_t> p = {64};
     Benchmark b("ciphertext_matadd");
     for (auto ni : n)
     {
@@ -77,35 +80,54 @@ void benchmark_ciphertext_matadd()
         {
             for (auto pi : p)
             {
-                Tensor<CryptoSystem::CipherText *> ct1(ni, mi, nullptr);
-                ct1.flatten();
-#pragma omp parallel for
+                Tensor<CryptoSystem::PlainText *> pt1(ni, mi, nullptr);
+                pt1.flatten();
                 for (size_t i = 0; i < ni * mi; i++)
                 {
-                    ct1.at(i) = new CryptoSystem::CipherText(cs.encrypt(pk, cs.make_plaintext(i + 1)));
+                    pt1.at(i) = new CryptoSystem::PlainText(cs.make_plaintext(i + 1));
                 }
-                Tensor<CryptoSystem::CipherText *> ct2(mi, pi, nullptr);
-                ct2.flatten();
-#pragma omp parallel for
+                Tensor<CryptoSystem::PlainText *> pt2(mi, pi, nullptr);
+                pt2.flatten();
                 for (size_t i = 0; i < mi * pi; i++)
                 {
-                    ct2.at(i) = new CryptoSystem::CipherText(cs.encrypt(pk, cs.make_plaintext(i + 1)));
+                    pt2.at(i) = new CryptoSystem::PlainText(cs.make_plaintext(i + 1));
                 }
-                ct1.reshape({ni, mi});
-                ct2.reshape({mi, pi});
+                pt1.reshape({ni, mi});
+                pt2.reshape({mi, pi});
+                auto ct1 = cs.encrypt_tensor(pk, pt1);
+                auto ct2 = cs.encrypt_tensor(pk, pt2);
                 auto matadd = [&cs, &pk, &ct1, &ct2]()
                 {
-                    cs.add_ciphertext_tensors(pk, ct1, ct2);
+                    auto res = cs.add_ciphertext_tensors(pk, ct1, ct2);
+                    for (int i = 0; i < 49; ++i)
+                    {
+                        auto res_c = cs.add_ciphertext_tensors(pk, res, ct2);
+                        res.flatten();
+                        for (size_t i = 0; i < res.num_elements(); i++)
+                        {
+                            delete res.at(i);
+                        }
+                        res = res_c;
+                    }
+                    res.flatten();
+                    for (size_t i = 0; i < res.num_elements(); i++)
+                    {
+                        delete res.at(i);
+                    }
                 };
                 b.run(matadd, 1);
+                pt1.flatten();
+                pt2.flatten();
                 ct1.flatten();
                 ct2.flatten();
                 for (size_t i = 0; i < ni * mi; i++)
                 {
+                    delete pt1.at(i);
                     delete ct1.at(i);
                 }
                 for (size_t i = 0; i < mi * pi; i++)
                 {
+                    delete pt2.at(i);
                     delete ct2.at(i);
                 }
                 std::cout << "n: " << ni << " m: " << mi << " p: " << pi << std::endl;
@@ -124,8 +146,8 @@ void benchmark_scal_matmul()
     // std::vector<size_t> m = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
     // std::vector<size_t> p = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
     std::vector<size_t> n = {8};
-    std::vector<size_t> m = {768};
-    std::vector<size_t> p = {768};
+    std::vector<size_t> m = {64};
+    std::vector<size_t> p = {64};
     Benchmark b("scal_matmul");
     float min_time_ratio_with_mi_pi = std::numeric_limits<float>::max();
     size_t min_pi = 0, min_mi = 0;
@@ -136,37 +158,49 @@ void benchmark_scal_matmul()
             for (auto pi : p)
             {
 
-                Tensor<CryptoSystem::CipherText *> ct1(ni, mi, nullptr);
-                ct1.flatten();
-#pragma omp parallel for
+                Tensor<CryptoSystem::PlainText *> pt1(ni, mi, nullptr);
+                pt1.flatten();
                 for (size_t i = 0; i < ni * mi; i++)
                 {
-                    ct1.at(i) = new CryptoSystem::CipherText(cs.encrypt(pk, cs.make_plaintext(i + 1)));
+                    pt1.at(i) = new CryptoSystem::PlainText(cs.make_plaintext(i + 1));
                 }
+                pt1.reshape({ni, mi});
+                auto ct1 = cs.encrypt_tensor(pk, pt1);
                 Tensor<CryptoSystem::PlainText *> pt2(mi, pi, nullptr);
                 pt2.flatten();
-#pragma omp parallel for
                 for (size_t i = 0; i < mi * pi; i++)
                 {
                     pt2.at(i) = new CryptoSystem::PlainText(cs.make_plaintext(i + 1));
                 }
                 ct1.reshape({ni, mi});
                 pt2.reshape({mi, pi});
-                Tensor<CryptoSystem::CipherText *> res(ni, pi, nullptr);
-                auto scal_matmul = [&cs, &pk, &pt2, &ct1, &res]()
+                auto scal_matmul = [&cs, &pk, &pt2, &ct1]()
                 {
-                    res = cs.scal_ciphertext_tensors(pk, pt2, ct1);
+                    auto res = cs.scal_ciphertext_tensors(pk, pt2, ct1);
+                    for (int i = 0; i < 49; ++i)
+                    {
+                        auto res_c = cs.scal_ciphertext_tensors(pk, pt2, res);
+                        res.flatten();
+                        for (size_t i = 0; i < res.num_elements(); i++)
+                        {
+                            delete res.at(i);
+                        }
+                        res = res_c;
+                    }
+                    res.flatten();
+                    for (size_t i = 0; i < res.num_elements(); i++)
+                    {
+                        delete res.at(i);
+                    }
+
                 };
                 b.run(scal_matmul, 1);
-                res.flatten();
-                for (size_t i = 0; i < res.num_elements(); i++)
-                {
-                    delete res.at(i);
-                }
+                pt1.flatten();
                 ct1.flatten();
                 pt2.flatten();
                 for (size_t i = 0; i < ni * mi; i++)
                 {
+                    delete pt1.at(i);
                     delete ct1.at(i);
                 }
                 for (size_t i = 0; i < mi * pi; i++)
@@ -174,23 +208,9 @@ void benchmark_scal_matmul()
                     delete pt2.at(i);
                 }
                 std::cout << "n: " << ni << " m: " << mi << " p: " << pi << std::endl;
-                std::cout << "n: " << ni << " m: " << mi << " p: " << pi << std::endl;
-                std::cout << (b.last_run().count()) / (mi * pi) << "ms" << std::endl;
-                if ((b.last_run().count()) / (mi) < min_time_ratio_with_mi_pi)
-                {
-                    min_time_ratio_with_mi_pi = (b.last_run().count()) / (mi);
-                    min_pi = pi;
-                    min_mi = mi;
-                }
-                break;
             }
-            break;
         }
-        break;
     }
-    std::cout << "min_time_ratio_with_mi_pi: " << min_time_ratio_with_mi_pi << std::endl;
-    std::cout << "min_pi: " << min_pi << std::endl;
-    std::cout << "min_mi: " << min_mi << std::endl;
     b.print_summary();
 }
 
