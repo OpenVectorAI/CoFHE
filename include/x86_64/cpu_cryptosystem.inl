@@ -559,9 +559,9 @@ inline String CPUCryptoSystem::serialize_part_decryption_result_tensor(const Ten
     // write data
     CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0; i < pdr_cpu.num_elements(); i++)
     {
-        mpz_export(data_ptr + data_offsets[i * 3], NULL, -1, 1, -1, 0, (mpz_srcptr)(pdr_cpu_flattened.at(i)->a()));
-        mpz_export(data_ptr + data_offsets[i * 3 + 1], NULL, -1, 1, -1, 0, (mpz_srcptr)(pdr_cpu_flattened.at(i)->b()));
-        mpz_export(data_ptr + data_offsets[i * 3 + 2], NULL, -1, 1, -1, 0, (mpz_srcptr)(pdr_cpu_flattened.at(i)->c()));
+        mpz_export(data_ptr + (data_offsets[i * 3] & (~((uint64_t)(1) << 63))), NULL, -1, 1, -1, 0, (mpz_srcptr)(pdr_cpu_flattened.at(i)->a()));
+        mpz_export(data_ptr + (data_offsets[i * 3 + 1] & (~((uint64_t)(1) << 63))), NULL, -1, 1, -1, 0, (mpz_srcptr)(pdr_cpu_flattened.at(i)->b()));
+        mpz_export(data_ptr + (data_offsets[i * 3 + 2] & (~((uint64_t)(1) << 63))), NULL, -1, 1, -1, 0, (mpz_srcptr)(pdr_cpu_flattened.at(i)->c()));
     }
     return data;
 }
