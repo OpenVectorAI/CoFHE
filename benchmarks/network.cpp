@@ -18,57 +18,79 @@ auto get_client_node(std::string setup_node_ip, std::string setup_node_port)
 
 void benchmark_ciphertext_matmul(ClientNode<CPUCryptoSystem> &client_node)
 {
+    using CryptoSystem = CPUCryptoSystem;
     // std::vector<size_t> n = {8, 16, 32, 64, 128};
     // std::vector<size_t> m = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
     // std::vector<size_t> p = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
-    std::vector<size_t> n = { 8};
-    std::vector<size_t> m = { 768};
-    std::vector<size_t> p = { 768};
+    std::vector<size_t> n = {8};
+    std::vector<size_t> m = {64};
+    std::vector<size_t> p = {64};
     Benchmark b("ciphertext_matmul");
+    auto cs = client_node.crypto_system();
+    auto pk = client_node.network_public_key();
     for (auto ni : n)
     {
         for (auto mi : m)
         {
             for (auto pi : p)
             {
-                Tensor<CPUCryptoSystem::CipherText *> ct1(ni, mi, nullptr);
-                ct1.flatten();
-#pragma omp parallel for
+                Tensor<CryptoSystem::PlainText *> pt1(ni, mi, nullptr);
+                pt1.flatten();
                 for (size_t i = 0; i < ni * mi; i++)
                 {
-                    ct1.at(i) = new CPUCryptoSystem::CipherText(client_node.crypto_system().encrypt(client_node.network_public_key(), client_node.crypto_system().make_plaintext(i + 1)));
+                    pt1.at(i) = new CryptoSystem::PlainText(cs.make_plaintext(i + 1));
                 }
-                Tensor<CPUCryptoSystem::CipherText *> ct2(mi, pi, nullptr);
-                ct2.flatten();
-#pragma omp parallel for
+                Tensor<CryptoSystem::PlainText *> pt2(mi, pi, nullptr);
+                pt2.flatten();
                 for (size_t i = 0; i < mi * pi; i++)
                 {
-                    ct2.at(i) = new CPUCryptoSystem::CipherText(client_node.crypto_system().encrypt(client_node.network_public_key(), client_node.crypto_system().make_plaintext(i + 1)));
+                    pt2.at(i) = new CryptoSystem::PlainText(cs.make_plaintext(i + 1));
                 }
-                ct1.reshape({ni, mi});
-                ct2.reshape({mi, pi});
-                ComputeRequest req = ComputeRequest(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::MULTIPLY, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, client_node.crypto_system().serialize_ciphertext_tensor(ct1)), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, client_node.crypto_system().serialize_ciphertext_tensor(ct2))}));
-                ComputeResponse *res_;
-                auto matmul = [&client_node, &ct1, &ct2, &res_, &req]()
+                pt1.reshape({ni, mi});
+                pt2.reshape({mi, pi});
+                auto ct1 = cs.encrypt_tensor(pk, pt1);
+                auto ct2 = cs.encrypt_tensor(pk, pt2);
+                auto matmul = [&client_node, &ct1, &ct2, &cs]()
                 {
+                    ComputeRequest req = ComputeRequest(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::MULTIPLY, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(ct1)), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(ct2))}));
+                    ComputeResponse *res_;
                     client_node.compute(req, &res_);
+                    auto res = cs.deserialize_ciphertext_tensor(res_->data());
+                    delete res_;
+                    for (size_t i = 0; i < 49; i++)
+                    {
+                        ComputeRequest req_c = ComputeRequest(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::MULTIPLY, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(res)), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(ct2))}));
+                        ComputeResponse *res_c_;
+                        client_node.compute(req_c, &res_c_);
+                        auto res_c = cs.deserialize_ciphertext_tensor(res_c_->data());
+                        delete res_c_;
+                        res.flatten();
+                        for (size_t i = 0; i < res.num_elements(); i++)
+                        {
+                            delete res.at(i);
+                        }
+                        res = res_c;
+                        std::cout << "Iteration: " << i << std::endl;
+                    }
+                    res.flatten();
+                    for (size_t i = 0; i < res.num_elements(); i++)
+                    {
+                        delete res.at(i);
+                    } 
                 };
                 b.run(matmul, 1);
-                auto res = client_node.crypto_system().deserialize_ciphertext_tensor(res_->data());
-                delete res_;
-                res.flatten();
-                for (size_t i = 0; i < res.num_elements(); i++)
-                {
-                    delete res.at(i);
-                }
+                pt1.flatten();
+                pt2.flatten();
                 ct1.flatten();
                 ct2.flatten();
                 for (size_t i = 0; i < ni * mi; i++)
                 {
+                    delete pt1.at(i);
                     delete ct1.at(i);
                 }
                 for (size_t i = 0; i < mi * pi; i++)
                 {
+                    delete pt2.at(i);
                     delete ct2.at(i);
                 }
                 std::cout << "n: " << ni << " m: " << mi << " p: " << pi << std::endl;
@@ -83,50 +105,69 @@ void benchmark_scalar_ciphertext_matmul(ClientNode<CPUCryptoSystem> &client_node
     // std::vector<size_t> n = {8, 16, 32, 64, 128};
     // std::vector<size_t> m = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
     // std::vector<size_t> p = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
-    std::vector<size_t> n = { 8};
-    std::vector<size_t> m = { 768};
-    std::vector<size_t> p = { 768};
+    using CryptoSystem = CPUCryptoSystem;
+    std::vector<size_t> n = {8};
+    std::vector<size_t> m = {64};
+    std::vector<size_t> p = {64};
     Benchmark b("scalar_ciphertext_matmul");
+    auto cs = client_node.crypto_system();
+    auto pk = client_node.network_public_key();
     for (auto ni : n)
     {
         for (auto mi : m)
         {
             for (auto pi : p)
             {
-                Tensor<CPUCryptoSystem::CipherText *> ct1(ni, mi, nullptr);
-                ct1.flatten();
-#pragma omp parallel for
+                Tensor<CryptoSystem::PlainText *> pt1(ni, mi, nullptr);
+                pt1.flatten();
                 for (size_t i = 0; i < ni * mi; i++)
                 {
-                    ct1.at(i) = new CPUCryptoSystem::CipherText(client_node.crypto_system().encrypt(client_node.network_public_key(), client_node.crypto_system().make_plaintext(i + 1)));
+                    pt1.at(i) = new CryptoSystem::PlainText(cs.make_plaintext(i + 1));
                 }
-                Tensor<CPUCryptoSystem::PlainText *> pt2(mi, pi, nullptr);
+                pt1.reshape({ni, mi});
+                auto ct1 = cs.encrypt_tensor(pk, pt1);
+                Tensor<CryptoSystem::PlainText *> pt2(mi, pi, nullptr);
                 pt2.flatten();
-#pragma omp parallel for
                 for (size_t i = 0; i < mi * pi; i++)
                 {
-                    pt2.at(i) = new CPUCryptoSystem::PlainText(client_node.crypto_system().make_plaintext(i + 1));
+                    pt2.at(i) = new CryptoSystem::PlainText(cs.make_plaintext(i + 1));
                 }
                 ct1.reshape({ni, mi});
                 pt2.reshape({mi, pi});
-                ComputeRequest req = ComputeRequest(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::MULTIPLY, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, client_node.crypto_system().serialize_ciphertext_tensor(ct1)), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::PLAINTEXT, client_node.crypto_system().serialize_plaintext_tensor(pt2))}));
-                ComputeResponse *res_;
-                auto scal_matmul = [&client_node, &pt2, &ct1, &res_, &req]()
+                auto scal_matmul = [&client_node, &pt2, &ct1, &cs]()
                 {
+                    ComputeRequest req = ComputeRequest(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::MULTIPLY, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(ct1)), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::PLAINTEXT, cs.serialize_plaintext_tensor(pt2))}));
+                    ComputeResponse *res_;
                     client_node.compute(req, &res_);
+                    auto res = cs.deserialize_ciphertext_tensor(res_->data());
+                    delete res_;
+                    for (size_t i = 0; i < 49; i++)
+                    {
+                        ComputeRequest req_c = ComputeRequest(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::MULTIPLY, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(res)), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::PLAINTEXT, cs.serialize_plaintext_tensor(pt2))}));
+                        ComputeResponse *res_c_;
+                        client_node.compute(req_c, &res_c_);
+                        auto res_c = cs.deserialize_ciphertext_tensor(res_c_->data());
+                        delete res_c_;
+                        res.flatten();
+                        for (size_t i = 0; i < res.num_elements(); i++)
+                        {
+                            delete res.at(i);
+                        }
+                        res = res_c;
+                    }
+                    res.flatten();
+                    for (size_t i = 0; i < res.num_elements(); i++)
+                    {
+                        delete res.at(i);
+                    }
                 };
                 b.run(scal_matmul, 1);
-                auto res = client_node.crypto_system().deserialize_ciphertext_tensor(res_->data());
-                delete res_;
-                res.flatten();
-                for (size_t i = 0; i < res.num_elements(); i++)
-                {
-                    delete res.at(i);
-                }
+                pt1.flatten();
                 ct1.flatten();
                 pt2.flatten();
                 for (size_t i = 0; i < ni * mi; i++)
                 {
+                    delete pt1.at(i);
                     delete ct1.at(i);
                 }
                 for (size_t i = 0; i < mi * pi; i++)
@@ -142,57 +183,79 @@ void benchmark_scalar_ciphertext_matmul(ClientNode<CPUCryptoSystem> &client_node
 
 void benchmark_ciphertext_matadd(ClientNode<CPUCryptoSystem> &client_node)
 {
+
+    using CryptoSystem = CPUCryptoSystem;
     // std::vector<size_t> n = {8, 16, 32, 64, 128};
     // std::vector<size_t> m = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
     // std::vector<size_t> p = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
-    std::vector<size_t> n = { 768};
-    std::vector<size_t> m = { 768};
-    std::vector<size_t> p = { 768};
+    std::vector<size_t> n = {64};
+    std::vector<size_t> m = {64};
+    std::vector<size_t> p = {64};
     Benchmark b("ciphertext_matadd");
+    auto cs = client_node.crypto_system();
+    auto pk = client_node.network_public_key();
     for (auto ni : n)
     {
         for (auto mi : m)
         {
             for (auto pi : p)
             {
-                Tensor<CPUCryptoSystem::CipherText *> ct1(ni, mi, nullptr);
-                ct1.flatten();
-#pragma omp parallel for
+                Tensor<CryptoSystem::PlainText *> pt1(ni, mi, nullptr);
+                pt1.flatten();
                 for (size_t i = 0; i < ni * mi; i++)
                 {
-                    ct1.at(i) = new CPUCryptoSystem::CipherText(client_node.crypto_system().encrypt(client_node.network_public_key(), client_node.crypto_system().make_plaintext(i + 1)));
+                    pt1.at(i) = new CryptoSystem::PlainText(cs.make_plaintext(i + 1));
                 }
-                Tensor<CPUCryptoSystem::CipherText *> ct2(ni, mi, nullptr);
-                ct2.flatten();
-#pragma omp parallel for
-                for (size_t i = 0; i < ni * mi; i++)
+                Tensor<CryptoSystem::PlainText *> pt2(mi, pi, nullptr);
+                pt2.flatten();
+                for (size_t i = 0; i < mi * pi; i++)
                 {
-                    ct2.at(i) = new CPUCryptoSystem::CipherText(client_node.crypto_system().encrypt(client_node.network_public_key(), client_node.crypto_system().make_plaintext(i + 1)));
+                    pt2.at(i) = new CryptoSystem::PlainText(cs.make_plaintext(i + 1));
                 }
-                ct1.reshape({ni, mi});
-                ct2.reshape({ni, mi});
-                ComputeRequest req = ComputeRequest(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::ADD, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, client_node.crypto_system().serialize_ciphertext_tensor(ct1)), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, client_node.crypto_system().serialize_ciphertext_tensor(ct2))}));
-                ComputeResponse *res_;
-                auto matadd = [&client_node, &ct1, &ct2, &res_, &req]()
+                pt1.reshape({ni, mi});
+                pt2.reshape({mi, pi});
+                auto ct1 = cs.encrypt_tensor(pk, pt1);
+                auto ct2 = cs.encrypt_tensor(pk, pt2);
+                auto matadd = [&client_node, &ct1, &ct2, &cs]()
                 {
+                    ComputeRequest req = ComputeRequest(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::ADD, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(ct1)), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(ct2))}));
+                    ComputeResponse *res_;
                     client_node.compute(req, &res_);
+                    auto res = cs.deserialize_ciphertext_tensor(res_->data());
+                    delete res_;
+                    for (size_t i = 0; i < 49; i++)
+                    {
+                        ComputeRequest req_c = ComputeRequest(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::BINARY, ComputeRequest::ComputeOperation::ADD, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(res)), ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(ct2))}));
+                        ComputeResponse *res_c_;
+                        client_node.compute(req_c, &res_c_);
+                        auto res_c = cs.deserialize_ciphertext_tensor(res_c_->data());
+                        delete res_c_;
+                        res.flatten();
+                        for (size_t i = 0; i < res.num_elements(); i++)
+                        {
+                            delete res.at(i);
+                        }
+                        res = res_c;
+                    }
+                    res.flatten();
+                    for (size_t i = 0; i < res.num_elements(); i++)
+                    {
+                        delete res.at(i);
+                    }
                 };
                 b.run(matadd, 1);
-                auto res = client_node.crypto_system().deserialize_ciphertext_tensor(res_->data());
-                delete res_;
-                res.flatten();
-                for (size_t i = 0; i < res.num_elements(); i++)
-                {
-                    delete res.at(i);
-                }
+                pt1.flatten();
+                pt2.flatten();
                 ct1.flatten();
                 ct2.flatten();
                 for (size_t i = 0; i < ni * mi; i++)
                 {
+                    delete pt1.at(i);
                     delete ct1.at(i);
                 }
                 for (size_t i = 0; i < ni * mi; i++)
                 {
+                    delete pt2.at(i);
                     delete ct2.at(i);
                 }
                 std::cout << "n: " << ni << " m: " << mi << " p: " << pi << std::endl;
@@ -206,39 +269,43 @@ void benchmark_decrypt(ClientNode<CPUCryptoSystem> &client_node)
 {
     // std::vector<size_t> n = {8, 16, 32, 64, 128, 256, 512, 1024};
     // std::vector<size_t> m = {32, 64, 128, 256, 512, 768, 1024, 1536, 2048};
-    std::vector<size_t> n = { 8};
-    std::vector<size_t> m = { 768};
+    std::vector<size_t> n = {64};
+    std::vector<size_t> m = {64};
     Benchmark b("decrypt");
+    auto cs = client_node.crypto_system();
+    auto pk = client_node.network_public_key();
     for (auto ni : n)
     {
         for (auto mi : m)
         {
 
-            Tensor<CPUCryptoSystem::CipherText *> ct1(ni, mi, nullptr);
-            ct1.flatten();
-#pragma omp parallel for
+            Tensor<CPUCryptoSystem::PlainText *> pt1(ni, mi, nullptr);
+            pt1.flatten();
             for (size_t i = 0; i < ni * mi; i++)
             {
-                ct1.at(i) = new CPUCryptoSystem::CipherText(client_node.crypto_system().encrypt(client_node.network_public_key(), client_node.crypto_system().make_plaintext(i + 1)));
+                pt1.at(i) = new CPUCryptoSystem::PlainText(cs.make_plaintext(i + 1));
             }
-            ct1.reshape({ni, mi});
-            ComputeRequest req = ComputeRequest(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::UNARY, ComputeRequest::ComputeOperation::DECRYPT, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, client_node.crypto_system().serialize_ciphertext_tensor(ct1))}));
-            ComputeResponse *res_;
-            auto decrypt = [&client_node, &ct1, &res_, &req]()
+            pt1.reshape({ni, mi});
+            auto ct1 = cs.encrypt_tensor(pk, pt1);
+            auto decrypt = [&client_node, &ct1, &cs]()
             {
+                ComputeRequest req = ComputeRequest(ComputeRequest::ComputeOperationInstance(ComputeRequest::ComputeOperationType::UNARY, ComputeRequest::ComputeOperation::DECRYPT, {ComputeRequest::ComputeOperationOperand(ComputeRequest::DataType::TENSOR, ComputeRequest::DataEncrytionType::CIPHERTEXT, cs.serialize_ciphertext_tensor(ct1))}));
+                ComputeResponse *res_;
                 client_node.compute(req, &res_);
+                auto res = cs.deserialize_plaintext_tensor(res_->data());
+                delete res_;
+                res.flatten();
+                for (size_t i = 0; i < res.num_elements(); i++)
+                {
+                    delete res.at(i);
+                }
             };
             b.run(decrypt, 1);
-            auto res = client_node.crypto_system().deserialize_plaintext_tensor(res_->data());
-            delete res_;
-            res.flatten();
-            for (size_t i = 0; i < res.num_elements(); i++)
-            {
-                delete res.at(i);
-            }
+            pt1.flatten();
             ct1.flatten();
             for (size_t i = 0; i < ni * mi; i++)
             {
+                delete pt1.at(i);
                 delete ct1.at(i);
             }
             std::cout << "n: " << ni << " m: " << mi << std::endl;
