@@ -47,52 +47,43 @@ inline Vector<CPUCryptoSystem::PlainText> CPUCryptoSystem::generate_random_beave
 }
 
 BICYCL::Mpz map_to_positive(float x,
-                            const mpf_t &scaling_factor, const mpf_t &M, const mpf_t &mM_half,
-                            bool is_bias = false)
+                            const mpf_t &scaling_factor, const mpf_t &M, const mpf_t &mM_half)
 {
-    return BICYCL::Mpz{(unsigned long)(x)};
-    // mpf_t scaled_x;
-    // mpf_init(scaled_x);
-    // mpf_set_d(scaled_x, x);
-    // mpf_mul(scaled_x, scaled_x, scaling_factor);
-    // if (is_bias)
-    // {
-    //     mpf_mul(scaled_x, scaled_x, scaling_factor);
-    // }
-    // if (x < 0)
-    // {
-    //     mpf_add(scaled_x, scaled_x, M);
-    // }
-    // mpz_t scaled_x_z;
-    // mpz_init(scaled_x_z);
-    // mpz_set_f(scaled_x_z, scaled_x);
-    // std::string scaled_x_str = mpz_get_str(NULL, 10, scaled_x_z);
-    // mpz_clear(scaled_x_z);
-    // mpf_clear(scaled_x);
-    // return BICYCL::Mpz(scaled_x_str);
+    mpf_t scaled_x;
+    mpf_init(scaled_x);
+    mpf_set_d(scaled_x, x);
+    mpf_mul(scaled_x, scaled_x, scaling_factor);
+    if (x < 0)
+    {
+        mpf_add(scaled_x, scaled_x, M);
+    }
+    mpz_t scaled_x_z;
+    mpz_init(scaled_x_z);
+    mpz_set_f(scaled_x_z, scaled_x);
+    std::string scaled_x_str = mpz_get_str(NULL, 10, scaled_x_z);
+    mpz_clear(scaled_x_z);
+    mpf_clear(scaled_x);
+    return BICYCL::Mpz(scaled_x_str);
 }
 
 float map_back(const BICYCL::Mpz &z,
                const mpf_t &scaling_factor, const mpf_t &M, const mpf_t &mM_half)
 {
-    return (unsigned long)(z);
-    // mpf_t num;
-    // mpf_init(num);
-    // mpf_set_z(num, z.operator const __mpz_struct *());
-    // if (mpf_cmp(num, mM_half) < 0)
-    // {
-    //     mpf_div(num, num, scaling_factor);
-    //     // mpf_div(num, num, scaling_factor);
-    // }
-    // else
-    // {
-    //     mpf_sub(num, num, M);
-    //     mpf_div(num, num, scaling_factor);
-    //     // mpf_div(num, num, scaling_factor);
-    // }
-    // float res = mpf_get_d(num);
-    // mpf_clear(num);
-    // return res;
+    mpf_t num;
+    mpf_init(num);
+    mpf_set_z(num, z.operator const __mpz_struct *());
+    if (mpf_cmp(num, mM_half) < 0)
+    {
+        mpf_div(num, num, scaling_factor);
+    }
+    else
+    {
+        mpf_sub(num, num, M);
+        mpf_div(num, num, scaling_factor);
+    }
+    float res = mpf_get_d(num);
+    mpf_clear(num);
+    return res;
 }
 
 inline CPUCryptoSystem::PlainText CPUCryptoSystem::negate_plaintext(const CPUCryptoSystem::PlainText &s) const
