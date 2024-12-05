@@ -9,3 +9,7 @@ add_test(node_test node)
 add_executable(tutorial tutorial.cpp)
 target_link_libraries(tutorial PUBLIC CoFHE)
 add_dependencies(cofhe_examples tutorial)
+
+add_executable(linear_regression linear_regression.cpp)
+target_link_libraries(linear_regression PUBLIC CoFHE)
+add_dependencies(cofhe_examples linear_regression)
