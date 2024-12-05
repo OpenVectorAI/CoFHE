@@ -31,7 +31,7 @@ int main(int argc, char const *argv[])
             CryptoSystemType::CoFHE_CPU,
             "public_key",
             128,
-            256,
+            128,
             2,
             3};
         auto setup_node = make_setup_node<CPUCryptoSystem>(self_details, cs_details);

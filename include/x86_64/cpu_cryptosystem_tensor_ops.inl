@@ -82,18 +82,18 @@ inline Tensor<CPUCryptoSystem::PlainText *> CPUCryptoSystem::add_plaintext_tenso
     {
         throw std::invalid_argument("Tensor shapes must be equal");
     }
-    if (pt1.ndim() == 1)
+    auto pt1_flattened = pt1;
+    pt1_flattened.flatten();
+    auto pt2_flattened = pt2;
+    pt2_flattened.flatten();
+    Tensor<CPUCryptoSystem::PlainText *> res(pt1.shape(), nullptr);
+    res.flatten();
+    CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0; i < pt1.num_elements(); i++)
     {
-        Tensor<CPUCryptoSystem::PlainText *> res(pt1.shape(), nullptr);
-        res.flatten();
-        CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0; i < pt1.num_elements(); i++)
-        {
-            res[i] = new CPUCryptoSystem::PlainText(this->add_plaintexts(*pt1[i], *pt2[i]));
-        }
-        res.reshape(pt1.shape());
-        return res;
+        res[i] = new CPUCryptoSystem::PlainText(this->add_plaintexts(*pt1_flattened[i], *pt2_flattened[i]));
     }
-    throw std::runtime_error("Not implemented");
+    res.reshape(pt1.shape());
+    return res;
 }
 
 inline Tensor<CPUCryptoSystem::PlainText *> CPUCryptoSystem::multiply_plaintext_tensors(const Tensor<CPUCryptoSystem::PlainText *> &pt1, const Tensor<CPUCryptoSystem::PlainText *> &pt2) const
@@ -102,12 +102,12 @@ inline Tensor<CPUCryptoSystem::PlainText *> CPUCryptoSystem::multiply_plaintext_
     {
         return Tensor<CPUCryptoSystem::PlainText *>(new CPUCryptoSystem::PlainText(this->multiply_plaintexts(*pt1.get_value(), *pt2.get_value())));
     }
-    if (pt1.shape() != pt2.shape())
+    if (pt1.ndim() == 1 && pt2.ndim() == 1)
     {
-        throw std::invalid_argument("Tensor shapes must be equal");
-    }
-    if (pt1.ndim() == 1)
-    {
+        if (pt1.shape() != pt2.shape())
+        {
+            throw std::invalid_argument("Tensor shapes must be equal");
+        }
         Tensor<CPUCryptoSystem::PlainText *> res(pt1.shape(), nullptr);
         res.flatten();
         CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0; i < pt1.num_elements(); i++)
@@ -117,7 +117,30 @@ inline Tensor<CPUCryptoSystem::PlainText *> CPUCryptoSystem::multiply_plaintext_
         res.reshape(pt1.shape());
         return res;
     }
-    throw std::runtime_error("Not implemented");
+    if (pt1.ndim() != 2 || pt2.ndim() != 2)
+    {
+        throw std::runtime_error("Not implemented");
+    }
+    if (pt1.shape()[1] != pt2.shape()[0])
+    {
+        throw std::invalid_argument("Tensor shapes must be compatible for matrix multiplication");
+    }
+    size_t n = pt1.shape()[0], m = pt1.shape()[1], p = pt2.shape()[1];
+    Tensor<CPUCryptoSystem::PlainText *> res({n, p}, nullptr);
+    res.flatten();
+    CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0; i < n; i++)
+    {
+        for (size_t j = 0; j < p; j++)
+        {
+            res[i * p + j] = new CPUCryptoSystem::PlainText(this->multiply_plaintexts(*pt1[i * m], *pt2[j]));
+            for (size_t k = 1; k < m; k++)
+            {
+                *res[i * p + j] = this->add_plaintexts(*res[i * p + j], this->multiply_plaintexts(*pt1[i * m + k], *pt2[k * p + j]));
+            }
+        }
+    }
+    res.reshape({n, p});
+    return res;
 }
 
 inline Tensor<CPUCryptoSystem::PlainText *> CPUCryptoSystem::negate_plaintext_tensor(const Tensor<CPUCryptoSystem::PlainText *> &s) const
@@ -151,8 +174,7 @@ inline Tensor<CPUCryptoSystem::CipherText *> CPUCryptoSystem::negate_ciphertext_
     Vector<BICYCL::Mpz> r_vec(cts.size());
     Vector<BICYCL::QFI> hr_vec(cts.size()), pkr_vec(cts.size());
     // see the comment in add_ciphertext_vectors
-    CoFHE_PARALLEL_FOR_STATIC_SCHEDULE
-    for (size_t i = 0; i < cts.size(); i++)
+    CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0; i < cts.size(); i++)
     {
         r_vec[i] = rand_gen.random_mpz(hsm2k.encrypt_randomness_bound());
         hsm2k.power_of_h(hr_vec[i], r_vec[i]);
@@ -166,8 +188,7 @@ inline Tensor<CPUCryptoSystem::CipherText *> CPUCryptoSystem::negate_ciphertext_
 #endif
     auto Cl_G = hsm2k.Cl_G();
     auto Cl_Delta = hsm2k.Cl_Delta();
-    CoFHE_PARALLEL_FOR_STATIC_SCHEDULE
-    for (size_t i = 0; i < cts.num_elements(); i++)
+    CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0; i < cts.num_elements(); i++)
     {
 #ifdef ADD_RANDOMNESS_IN_HOMOMORPHIC_OPERATIONS
 #ifndef DIFFERENT_RANDOMNESS_FOR_EACH_OPERATION
@@ -334,7 +355,7 @@ inline Tensor<CPUCryptoSystem::CipherText *> CPUCryptoSystem::scal_ciphertext_te
             Cl_G.nupow(c1, cts.at(i)->c1(), *s_cpu[i]);
             Cl_Delta.nupow(c2, cts.at(i)->c2(), *s_cpu[i]);
 #endif
-            res_vec.at(i)= new CPUCryptoSystem::CipherText(std::move(c1), std::move(c2));
+            res_vec.at(i) = new CPUCryptoSystem::CipherText(std::move(c1), std::move(c2));
         }
         return res_vec;
     }
