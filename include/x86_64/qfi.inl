@@ -65,6 +65,11 @@ inline void qfi_nupow(BICYCL::QFI **r_, const BICYCL::QFI &f, BICYCL::Mpz **n_, 
     {
         BICYCL::Mpz &n = *n_[exp_idx];
         BICYCL::QFI &r = *r_[exp_idx];
+        if (n.is_zero())
+        {
+            r = BICYCL::ClassGroup(f.discriminant()).one();
+            continue;
+        }
         size_t curr_degree = 0;
 
         int j = n.nbits() - 1;
