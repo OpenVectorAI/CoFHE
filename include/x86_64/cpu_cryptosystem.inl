@@ -314,6 +314,7 @@ inline Tensor<CPUCryptoSystem::PlainText *> CPUCryptoSystem::deserialize_plainte
             plaintexts.at(num_elements - 1)->neg();
         }
     }
+    plaintexts.reshape(shape_vec);
     return plaintexts;
 }
 
