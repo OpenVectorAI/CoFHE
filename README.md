@@ -1,6 +1,6 @@
 # CoFHE
 
-**Collaborative Fully Homomorphic Encryption (CoFHE)** is the first fully homomorphic encryption scheme designed for secure computations in a threshold distributed setup. CoFHE enables multiple parties to collaboratively perform computations over encrypted data without revealing any underlying information to individual parties.
+**Collaborative Fully Homomorphic Encryption (CoFHE)** is a homomorphic encryption scheme designed to perform any number of secure computations without needing any bootstrapping operations. In CoFHE most of the computation is done by a single node called compute node. Rest of the threshold number of nodes does only 5% of the computations, in order to support fully homomorphic operations at compute node.
 
 ## Documentation
 
@@ -14,7 +14,7 @@ CoFHE is a header-only C++ library, making it easy to integrate into your projec
 
 - **[BICYCL](https://github.com/OpenVectorAI/bicycl)**: For primitives of CPU-Crytosystem(CLHSM2k).
 - **[nlohmann/json](https://github.com/nlohmann/json)**: For serialization and deserialization.
-- **[boost/asio] - For asynchronous networking.
+- **boost/asio - For asynchronous networking.
 
 ### Including CoFHE in Your Project
 
@@ -77,7 +77,7 @@ CoFHE includes benchmark programs to evaluate the performance of the library bot
 5. **Start the CoFHE Network**
 
    ```bash
-   cd cofhe_examples
+   cd examples
    chmod +x start_network.sh
    ./start_network.sh
    ```
@@ -87,8 +87,8 @@ CoFHE includes benchmark programs to evaluate the performance of the library bot
 6. **Copy Network Credentials**
 
    ```bash
-   cp ./server.pem ../cofhe_benchmarks
-   cd ../cofhe_benchmarks
+   cp ./server.pem ../benchmarks
+   cd ../benchmarks
    ```
 
    The `server.pem` file contains the server's public key certificate necessary for secure communication.
@@ -220,3 +220,4 @@ CoFHE is licensed under the [BSD 3-Clause License]. See the license file for mor
 For further information or assistance:
 
 - **Email**: [support@openvector.ai](mailto:support@openvector.ai)
+  

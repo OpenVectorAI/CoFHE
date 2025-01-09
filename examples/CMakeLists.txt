@@ -13,3 +13,7 @@ add_dependencies(cofhe_examples tutorial)
 add_executable(linear_regression linear_regression.cpp)
 target_link_libraries(linear_regression PUBLIC CoFHE)
 add_dependencies(cofhe_examples linear_regression)
+
+add_executable(vector_search vector_search.cpp)
+target_link_libraries(vector_search PUBLIC CoFHE)
+add_dependencies(cofhe_examples vector_search)
