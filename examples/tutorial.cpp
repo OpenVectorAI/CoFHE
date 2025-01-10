@@ -1,9 +1,7 @@
 #include <iostream>
 #include <chrono>
+
 #include "cofhe.hpp"
-#include "node/network_details.hpp"
-#include "node/client_node.hpp"
-#include "node/compute_request_handler.hpp"
 
 using namespace CoFHE;
 

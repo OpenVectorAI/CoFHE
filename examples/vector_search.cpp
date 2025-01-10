@@ -1,4 +1,3 @@
-
 // the system assumes 3 parties - client, search engine, and content provider
 // we can easily implement the other configurations also using cofhe library
 // the content provider will calculate the encrypted embeddings vecotrs using the specified model and network encryption key
@@ -20,9 +19,6 @@
 #include <inttypes.h>
 
 #include "cofhe.hpp"
-#include "node/network_details.hpp"
-#include "node/client_node.hpp"
-#include "node/compute_request_handler.hpp"
 
 using namespace CoFHE;
 using CryptoSystem = CPUCryptoSystem;

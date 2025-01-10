@@ -8,6 +8,10 @@
 #include "common/tensor.hpp"
 #include "common/pointers.hpp"
 #include "x86_64/cpu_cryptosystem.hpp"
+#include "node/network_details.hpp"
+#include "node/nodes.hpp"
+#include "node/client_node.hpp"
+#include "node/compute_request_response.hpp"
 
 namespace CoFHE
 {
