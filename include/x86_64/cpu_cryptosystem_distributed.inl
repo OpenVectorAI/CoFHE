@@ -19,7 +19,7 @@ typedef struct
     int cols;
 } ISP;
 
-Matrix<int> compute_M_OR(const Matrix<int> &Ma, const Matrix<int> &Mb)
+inline Matrix<int> compute_M_OR(const Matrix<int> &Ma, const Matrix<int> &Mb)
 {
     int da = Ma.size();
     int ea = Ma[0].size();
@@ -62,7 +62,7 @@ Matrix<int> compute_M_OR(const Matrix<int> &Ma, const Matrix<int> &Mb)
     return M_OR;
 }
 
-Matrix<int> compute_M_AND(const Matrix<int> &Ma, const Matrix<int> &Mb)
+inline Matrix<int> compute_M_AND(const Matrix<int> &Ma, const Matrix<int> &Mb)
 {
     int da = Ma.size();
     int ea = Ma[0].size();
@@ -107,7 +107,7 @@ Matrix<int> compute_M_AND(const Matrix<int> &Ma, const Matrix<int> &Mb)
     return M_AND;
 }
 
-Matrix<int> generate_distribution_matrix_M(int n, int t,
+inline Matrix<int> generate_distribution_matrix_M(int n, int t,
                                            int threshold_combinations)
 {
     // See https://cs.au.dk/fileadmin/site_files/cs/PhD/PhD_Dissertations__pdf/Thesis-RIT.pdf
@@ -128,7 +128,7 @@ Matrix<int> generate_distribution_matrix_M(int n, int t,
     return M;
 }
 
-ISP generate_isp(const AccessStructure &A)
+inline ISP generate_isp(const AccessStructure &A)
 {
     int n = A.n, t = A.t;
     int threshold_combinations = nCr(n, t);
@@ -156,7 +156,7 @@ ISP generate_isp(const AccessStructure &A)
 }
 
 // Function to compute rho: ρ := (secret, ρ2, . . . , ρe)⊤; (ρ2, . . . , ρe) ←− [2^(l0+λ), 2^(l0+λ)]^(e−1)
-Array<BICYCL::Mpz> compute_rho(const BICYCL::Mpz &secret, int e, const BICYCL::CL_HSM2k &hsm2k, BICYCL::RandGen &randgen)
+inline Array<BICYCL::Mpz> compute_rho(const BICYCL::Mpz &secret, int e, const BICYCL::CL_HSM2k &hsm2k, BICYCL::RandGen &randgen)
 {
     Array<BICYCL::Mpz> rho(e);
     rho[0] = secret; // Set ρ(0) = s as per the algorithm
@@ -169,7 +169,7 @@ Array<BICYCL::Mpz> compute_rho(const BICYCL::Mpz &secret, int e, const BICYCL::C
     return rho;
 }
 
-Matrix<BICYCL::Mpz> compute_shares(const ISP &isp, const Array<BICYCL::Mpz> &rho)
+inline Matrix<BICYCL::Mpz> compute_shares(const ISP &isp, const Array<BICYCL::Mpz> &rho)
 {
     // See https://eprint.iacr.org/2022/1143.pdf Algorithm 8
     Matrix<int> M = isp.M;
@@ -202,7 +202,7 @@ Matrix<BICYCL::Mpz> compute_shares(const ISP &isp, const Array<BICYCL::Mpz> &rho
     return shares;
 }
 
-Matrix<BICYCL::Mpz> get_shares(const BICYCL::CL_HSM2k &hsm2k,
+inline Matrix<BICYCL::Mpz> get_shares(const BICYCL::CL_HSM2k &hsm2k,
                                 BICYCL::RandGen &randgen, const ISP &isp,
                                const BICYCL::Mpz& secret)
 {
@@ -211,7 +211,7 @@ Matrix<BICYCL::Mpz> get_shares(const BICYCL::CL_HSM2k &hsm2k,
 }
 
 // Function to compute λ for one threshold combination
-Array<BICYCL::Mpz> compute_lambda(int t)
+inline Array<BICYCL::Mpz> compute_lambda(int t)
 {
     // See https://cs.au.dk/fileadmin/site_files/cs/PhD/PhD_Dissertations__pdf/Thesis-RIT.pdf
     // Lemma 3.2, Page 26,27
@@ -228,7 +228,7 @@ Array<BICYCL::Mpz> compute_lambda(int t)
     return lambda;
 }
 
-BICYCL::QFI compute_d(const BICYCL::CL_HSM2k &hsm2k, const Array<BICYCL::QFI> &ds,
+inline BICYCL::QFI compute_d(const BICYCL::CL_HSM2k &hsm2k, const Array<BICYCL::QFI> &ds,
                       const Array<BICYCL::Mpz> &lambda)
 {
     BICYCL::QFI d;
@@ -241,7 +241,7 @@ BICYCL::QFI compute_d(const BICYCL::CL_HSM2k &hsm2k, const Array<BICYCL::QFI> &d
     return d;
 }
 
-BICYCL::QFI partDecrypt(const BICYCL::CL_HSM2k &hsm2k,
+inline BICYCL::QFI partDecrypt(const BICYCL::CL_HSM2k &hsm2k,
                         const BICYCL::CL_HSM2k::CipherText &ct, const BICYCL::Mpz &ski)
 {
     // See https://eprint.iacr.org/2022/1143.pdf Algorithm 10
@@ -253,7 +253,7 @@ BICYCL::QFI partDecrypt(const BICYCL::CL_HSM2k &hsm2k,
     return di;
 }
 
-BICYCL::CL_HSM2k::ClearText finalDecrypt(const BICYCL::CL_HSM2k &hsm2k,
+inline BICYCL::CL_HSM2k::ClearText finalDecrypt(const BICYCL::CL_HSM2k &hsm2k,
                                          const BICYCL::CL_HSM2k::CipherText &ct,
                                          const Array<BICYCL::QFI> &ds)
 {
@@ -269,7 +269,7 @@ BICYCL::CL_HSM2k::ClearText finalDecrypt(const BICYCL::CL_HSM2k &hsm2k,
     return BICYCL::CL_HSM2k::ClearText(hsm2k, hsm2k.dlog_in_F(r));
 }
 
-Vector<size_t> get_next_lexio_combination(Vector<size_t> &current_combination, int n, int t)
+inline Vector<size_t> get_next_lexio_combination(Vector<size_t> &current_combination, int n, int t)
 {
     Vector<size_t> next_combination = current_combination;
     int j = t - 1;

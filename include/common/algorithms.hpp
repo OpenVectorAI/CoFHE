@@ -44,7 +44,7 @@ namespace CoFHE
         return a > b ? a : b;
     }
 
-
+inline
 int nCr(int n, int r)
 {
     // return 1 / ((n + 1) * std::beta(n - k + 1, k + 1));

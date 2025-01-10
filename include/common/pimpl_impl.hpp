@@ -4,8 +4,6 @@
 #include "common/pimpl.hpp"
 #include "common/type_traits.hpp"
 
-#include "../cofhe_p.hpp"
-
 using namespace CoFHE;
 // template <typename T, typename Deleter>
 // PImpl<T, Deleter>::PImpl(OwningPtr<T> t) noexcept

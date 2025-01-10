@@ -109,7 +109,7 @@ namespace CoFHE
         Vector<value_type> data;
     };
 
-    inline void normalize_index(Vector<size_t> &index, const Vector<size_t> &shape, const Vector<size_t> &broadcast_degree)
+    static inline void normalize_index(Vector<size_t> &index, const Vector<size_t> &shape, const Vector<size_t> &broadcast_degree)
     {
         for (size_t i = 0; i < index.size(); i++)
         {
@@ -119,7 +119,7 @@ namespace CoFHE
 
     // check the stride(return value) after the function call to see if it is 0 or not
     // to confirm if the stride was completed or not
-    size_t make_forward_stride(size_t stride, const Vector<size_t> &start, const Vector<size_t> &end, size_t &current_section, size_t &consumed_part_of_current_section)
+    static inline  size_t make_forward_stride(size_t stride, const Vector<size_t> &start, const Vector<size_t> &end, size_t &current_section, size_t &consumed_part_of_current_section)
     {
 #ifdef DEBUG
         if (start.size() != end.size())
@@ -145,7 +145,7 @@ namespace CoFHE
         return stride;
     }
 
-    size_t make_backward_stride(size_t stride, const Vector<size_t> &start, const Vector<size_t> &end, size_t &current_section, size_t &consumed_part_of_current_section)
+    static inline  size_t make_backward_stride(size_t stride, const Vector<size_t> &start, const Vector<size_t> &end, size_t &current_section, size_t &consumed_part_of_current_section)
     {
 #ifdef DEBUG
         if (start.size() != end.size())
