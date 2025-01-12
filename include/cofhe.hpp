@@ -8,6 +8,10 @@
 #include "common/tensor.hpp"
 #include "common/pointers.hpp"
 #include "x86_64/cpu_cryptosystem.hpp"
+#include "node/network_details.hpp"
+#include "node/nodes.hpp"
+#include "node/client_node.hpp"
+#include "node/compute_request_response.hpp"
 
 namespace CoFHE
 {
@@ -93,18 +97,19 @@ namespace CoFHE
     HIGH
   };
 
-  auto make_cryptosystem(uint32_t security_level, std::uint32_t k, __attribute__((unused)) Device device)
+  inline auto make_cryptosystem(uint32_t security_level, std::uint32_t k, __attribute__((unused)) Device device)
   {
     return CPUCryptoSystem{security_level, k};
   }
 
-  auto make_cryptosystem(SecurityLevel security_level, uint32_t k, __attribute__((unused)) Device device)
+  inline auto make_cryptosystem(SecurityLevel security_level, uint32_t k, __attribute__((unused)) Device device)
   {
     uint32_t sec_level = security_level == SecurityLevel::LOW ? 80 : security_level == SecurityLevel::MEDIUM ? 128
                                                                                                              : 256;
     return CPUCryptoSystem{sec_level, k};
   }
-  auto make_cryptosystem(SecurityLevel security_level, Precision precision, uint32_t depth, __attribute__((unused)) Device device)
+
+  inline auto make_cryptosystem(SecurityLevel security_level, Precision precision, uint32_t depth, __attribute__((unused)) Device device)
   {
     uint32_t sec_level = security_level == SecurityLevel::LOW ? 80 : security_level == SecurityLevel::MEDIUM ? 128
                                                                                                              : 256;

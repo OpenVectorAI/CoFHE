@@ -7,7 +7,7 @@
 
 namespace CoFHE
 {
-    void print_vector(const Vector<size_t> &vec, std::ostream &out = std::cout)
+    inline void print_vector(const Vector<size_t> &vec, std::ostream &out = std::cout)
 
     {
         for (auto i : vec)

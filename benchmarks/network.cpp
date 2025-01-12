@@ -1,9 +1,6 @@
 #include <iostream>
 
 #include "cofhe.hpp"
-#include "node/network_details.hpp"
-#include "node/client_node.hpp"
-#include "node/compute_request_handler.hpp"
 
 #include "./benchmark.hpp"
 

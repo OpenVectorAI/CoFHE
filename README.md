@@ -14,7 +14,7 @@ CoFHE is a header-only C++ library, making it easy to integrate into your projec
 
 - **[BICYCL](https://github.com/OpenVectorAI/bicycl)**: For primitives of CPU-Crytosystem(CLHSM2k).
 - **[nlohmann/json](https://github.com/nlohmann/json)**: For serialization and deserialization.
-- **boost/asio - For asynchronous networking.
+- **boost/asio** - For asynchronous networking.
 
 ### Including CoFHE in Your Project
 
@@ -23,22 +23,19 @@ CoFHE is a header-only C++ library, making it easy to integrate into your projec
    ```bash
    git clone https://github.com/OpenVectorAI/cofhe.git
    ```
+2. **Initialize the Submodules**
 
-2. **Include Headers in Your Source Files**
+   ```bash
+   git submodule update --init --recursive
+   ```
+
+3. **Include Headers in Your Source Files**
 
    In your C++ source files, include the CoFHE headers:
 
    ```cpp
     #include "cofhe/cofhe.h"
-    #include "node/network_details.hpp"
-    #include "node/nodes.hpp"
-    #include "node/client_node.hpp"
-    #include "node/compute_request_handler.hpp"
    ```
-
-### Build Configuration
-
-CoFHE does not require linking against any libraries since it's header-only. Ensure that your compiler supports C++17 or later.
 
 ---
 
@@ -58,7 +55,7 @@ CoFHE includes benchmark programs to evaluate the performance of the library bot
 2. **Configure the Build with CMake**
 
    ```bash
-   cmake ..
+   cmake -DCMAKE_INSTALL_PREFIX=. ..
    ```
 
 3. **Compile the Examples and Benchmarks**

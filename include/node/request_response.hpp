@@ -16,7 +16,8 @@ namespace CoFHE
         {
             V1,
         };
-        std::string version_to_string(ProtocolVersion ver)
+
+        inline std::string version_to_string(ProtocolVersion ver)
         {
             switch (ver)
             {
@@ -50,7 +51,7 @@ namespace CoFHE
             // SMPC_EVALUATION_CAPABILITY_REQUEST, // made by the compute node to the cofhe node to see if it can do smpc evaluation
             // SMPC_EVALUATION_REQUEST,            // made by the compute node to the cofhe node
         };
-        std::string service_type_to_string(ServiceType type)
+        inline std::string service_type_to_string(ServiceType type)
         {
             switch (type)
             {

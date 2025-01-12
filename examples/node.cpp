@@ -3,12 +3,7 @@
 #include <string>
 #include <chrono>
 
-#include "node/network_details.hpp"
-#include "node/nodes.hpp"
-#include "node/client_node.hpp"
-#include "node/compute_request_handler.hpp"
-
-#define MALLOC_CHECK_ 3
+#include "cofhe.hpp"
 
 using namespace CoFHE;
 int main(int argc, char const *argv[])

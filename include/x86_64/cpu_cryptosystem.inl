@@ -46,7 +46,7 @@ inline Vector<CPUCryptoSystem::PlainText> CPUCryptoSystem::generate_random_beave
     return res;
 }
 
-BICYCL::Mpz map_to_positive(float x,
+inline BICYCL::Mpz map_to_positive(float x,
                             const mpf_t &scaling_factor, const mpf_t &M, const mpf_t &mM_half)
 {
     mpf_t scaled_x;
@@ -66,7 +66,7 @@ BICYCL::Mpz map_to_positive(float x,
     return BICYCL::Mpz(scaled_x_str);
 }
 
-float map_back(const BICYCL::Mpz &z,
+inline float map_back(const BICYCL::Mpz &z,
                const mpf_t &scaling_factor, const mpf_t &M, const mpf_t &mM_half)
 {
     mpf_t num;

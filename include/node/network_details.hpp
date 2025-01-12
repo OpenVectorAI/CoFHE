@@ -22,7 +22,7 @@ namespace CoFHE
         CLIENT_NODE
     };
 
-    std::string node_type_to_string(NodeType type)
+    inline std::string node_type_to_string(NodeType type)
     {
         switch (type)
         {
@@ -39,7 +39,7 @@ namespace CoFHE
         }
     }
 
-    NodeType string_to_node_type(const std::string &type)
+    inline NodeType string_to_node_type(const std::string &type)
     {
         if (type == "SETUP_NODE")
         {
@@ -75,7 +75,7 @@ namespace CoFHE
         CoFHE_CPU,
     };
 
-    std::string cryptosystem_type_to_string(CryptoSystemType type)
+    inline std::string cryptosystem_type_to_string(CryptoSystemType type)
     {
         switch (type)
         {
@@ -86,7 +86,7 @@ namespace CoFHE
         }
     }
 
-    CryptoSystemType string_to_cryptosystem_type(const std::string &type)
+    inline CryptoSystemType string_to_cryptosystem_type(const std::string &type)
     {
         if (type == "CoFHE_CPU")
         {

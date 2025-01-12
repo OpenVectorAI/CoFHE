@@ -184,7 +184,7 @@ namespace CoFHE
             }
         };
 
-        auto make_client(const std::string &address, const std::string &port, bool keep_session_alive = false)
+        inline auto make_client(const std::string &address, const std::string &port, bool keep_session_alive = false)
         {
             return Client(address, port, keep_session_alive);
         }
