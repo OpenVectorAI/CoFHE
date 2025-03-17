@@ -3,7 +3,6 @@
 
 #include <cstdint>
 
-#include "common/pimpl.hpp"
 #include "common/vector.hpp"
 #include "common/tensor.hpp"
 #include "common/pointers.hpp"
@@ -12,13 +11,10 @@
 #include "node/nodes.hpp"
 #include "node/client_node.hpp"
 #include "node/compute_request_response.hpp"
+#include "utils/binary_cpu_cryptosystem.hpp"
 
 namespace CoFHE
 {
-
-  template <typename T1, typename T2>
-  using Pair = std::pair<T1, T2>;
-
   template <typename CryptoSystemImpl, typename SecretKeyImpl, typename PublicKeyImpl, typename PlainTextImpl, typename CipherTextImpl, typename SecretKeyShareImpl, typename PartDecryptionResult>
   concept CryptoSystemConcept = requires(CryptoSystemImpl cs, SecretKeyImpl sk, PublicKeyImpl pk, PlainTextImpl pt, CipherTextImpl ct, SecretKeyShareImpl sks, PartDecryptionResult pdr) {
     { cs.keygen() } -> std::same_as<SecretKeyImpl>;
