@@ -15,3 +15,7 @@ add_dependencies(cofhe_examples linear_regression)
 add_executable(vector_search vector_search.cpp)
 target_link_libraries(vector_search PRIVATE CoFHE)
 add_dependencies(cofhe_examples vector_search)
+
+add_executable(comparison comparison.cpp)
+target_link_libraries(comparison PRIVATE CoFHE)
+add_dependencies(cofhe_examples comparison)

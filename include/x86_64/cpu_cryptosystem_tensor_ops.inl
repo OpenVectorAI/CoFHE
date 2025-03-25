@@ -127,19 +127,17 @@ inline Tensor<CPUCryptoSystem::PlainText *> CPUCryptoSystem::multiply_plaintext_
     }
     size_t n = pt1.shape()[0], m = pt1.shape()[1], p = pt2.shape()[1];
     Tensor<CPUCryptoSystem::PlainText *> res({n, p}, nullptr);
-    res.flatten();
     CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0; i < n; i++)
     {
         for (size_t j = 0; j < p; j++)
         {
-            res[i * p + j] = new CPUCryptoSystem::PlainText(this->multiply_plaintexts(*pt1[i * m], *pt2[j]));
+            res.at(i, j) = new CPUCryptoSystem::PlainText(this->multiply_plaintexts(*pt1.at(i, 0), *pt2.at(0, j)));
             for (size_t k = 1; k < m; k++)
             {
-                *res[i * p + j] = this->add_plaintexts(*res[i * p + j], this->multiply_plaintexts(*pt1[i * m + k], *pt2[k * p + j]));
+                *res.at(i, j) = this->add_plaintexts(*res.at(i, j), this->multiply_plaintexts(*pt1.at(i, k), *pt2.at(k, j)));
             }
         }
     }
-    res.reshape({n, p});
     return res;
 }
 
@@ -293,12 +291,17 @@ inline Tensor<CPUCryptoSystem::CipherText *> CPUCryptoSystem::scal_ciphertext_te
     {
         throw std::invalid_argument("Tensors must be 0D, 1D or 2D for now");
     }
+    if (s_cpu.ndim() != cts.ndim())
+    {
+        throw std::invalid_argument("Tensors must have the same number of dimensions");
+    }
+
     if (s_cpu.is_zero_degree() && cts.is_zero_degree())
     {
         return Tensor<CPUCryptoSystem::CipherText *>(new CPUCryptoSystem::CipherText(this->scal_ciphertext(pk_cpu, *s_cpu.get_value(), *cts.get_value())));
     }
 
-    if (s_cpu.is_column_vector() && cts.is_column_vector())
+    if (s_cpu.ndim()==1 && cts.ndim()==1)
     {
         if (s_cpu.shape()[0] != cts.shape()[0])
         {
@@ -360,10 +363,6 @@ inline Tensor<CPUCryptoSystem::CipherText *> CPUCryptoSystem::scal_ciphertext_te
         return res_vec;
     }
 
-    if (s_cpu.ndim() > 2 || cts.ndim() > 2)
-    {
-        throw std::invalid_argument("Tensors must be 0D, 1D or 2D for now");
-    }
     auto s_cpu_flattened = s_cpu;
     auto cts_flattened = cts;
     s_cpu_flattened.flatten();

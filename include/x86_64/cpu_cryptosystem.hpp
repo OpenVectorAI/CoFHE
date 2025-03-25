@@ -112,7 +112,7 @@ namespace CoFHE
         Tensor<CipherText *> negate_ciphertext_tensor(const PublicKey &pk, const Tensor<CipherText *> &ct) const;
 
         PlainText make_plaintext(float value) const;
-        float get_float_from_plaintext(const PlainText &pt) const;
+        float get_float_from_plaintext(const PlainText &pt, unsigned int scaling_factor=1,unsigned int depth=1) const;
 
         String serialize() const;
         String serialize_secret_key(const SecretKey &sk) const;
