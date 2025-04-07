@@ -10,12 +10,12 @@
 // we need mpn_scan1
 #include "gmp.h"
 
-#include "./common/algorithms.hpp"
-#include "./common/macros.hpp"
-#include "./common/vector.hpp"
-#include "./common/tensor.hpp"
-#include "./common/pointers.hpp"
-#include "./openmp.hpp"
+#include "common/algorithms.hpp"
+#include "common/macros.hpp"
+#include "common/vector.hpp"
+#include "common/tensor.hpp"
+#include "common/pointers.hpp"
+#include "common/openmp.hpp"
 
 namespace CoFHE
 {
@@ -28,7 +28,7 @@ namespace CoFHE
         using PublicKey = BICYCL::CL_HSM2k::PublicKey;
         using PlainText = BICYCL::Mpz;
         using CipherText = BICYCL::CL_HSM2k::CipherText;
-        using PartDecryptionResult = BICYCL::QFI;
+        using PartialDecryptionResult = BICYCL::QFI;
 
         CPUCryptoSystem(uint32_t security_level, uint32_t k, bool compact = false) : rand_gen(), hsm2k(BICYCL::CL_HSM2k(security_level, k, rand_gen, compact)), sec_level(security_level), k(k)
         {
@@ -81,15 +81,15 @@ namespace CoFHE
         PlainText decrypt(const SecretKey &sk, const CipherText &ct) const;
         Vector<PlainText *> decrypt_vector(const SecretKey &sk, const Vector<CipherText *> &ct) const;
         Tensor<PlainText *> decrypt_tensor(const SecretKey &sk, const Tensor<CipherText *> &ct) const;
-        PartDecryptionResult part_decrypt(const SecretKeyShare &sks, const CipherText &ct) const;
-        Vector<PartDecryptionResult *> part_decrypt_vector(const SecretKeyShare &sks, const Vector<CipherText *> &ct) const;
-        Tensor<PartDecryptionResult *> part_decrypt_tensor(const SecretKeyShare &sks, const Tensor<CipherText *> &ct) const;
-        PlainText combine_part_decryption_results(const CipherText &ct,
-                                                  const Vector<PartDecryptionResult> &pdrs) const;
-        Vector<PlainText *> combine_part_decryption_results_vector(const CipherText &ct,
-                                                                   const Vector<PartDecryptionResult *> &pdrs) const;
-        Tensor<PlainText *> combine_part_decryption_results_tensor(const Tensor<CipherText *> &ct,
-                                                                   const Vector<Tensor<PartDecryptionResult *>> &pdrs) const;
+        PartialDecryptionResult part_decrypt(const SecretKeyShare &sks, const CipherText &ct) const;
+        Vector<PartialDecryptionResult *> part_decrypt_vector(const SecretKeyShare &sks, const Vector<CipherText *> &ct) const;
+        Tensor<PartialDecryptionResult *> part_decrypt_tensor(const SecretKeyShare &sks, const Tensor<CipherText *> &ct) const;
+        PlainText combine_partial_decryption_results(const CipherText &ct,
+                                                  const Vector<PartialDecryptionResult> &pdrs) const;
+        Vector<PlainText *> combine_partial_decryption_results_vector(const CipherText &ct,
+                                                                   const Vector<PartialDecryptionResult *> &pdrs) const;
+        Tensor<PlainText *> combine_partial_decryption_results_tensor(const Tensor<CipherText *> &ct,
+                                                                   const Vector<Tensor<PartialDecryptionResult *>> &pdrs) const;
         CipherText add_ciphertexts(const PublicKey &pk, const CipherText &ct1, const CipherText &ct2) const;
         CipherText scal_ciphertext(const PublicKey &pk, const PlainText &s, const CipherText &ct) const;
 
@@ -100,8 +100,7 @@ namespace CoFHE
         Tensor<CipherText *> add_ciphertext_tensors(const PublicKey &pk, const Tensor<CipherText *> &ct1, const Tensor<CipherText *> &ct2) const;
         Tensor<CipherText *> scal_ciphertext_tensors(const PublicKey &pk, const Tensor<PlainText *> &s, const Tensor<CipherText *> &ct) const;
 
-        PlainText generate_random_plaintext() const;
-        Vector<PlainText> generate_random_beavers_triplet() const;
+        PlainText generate_random_plaintext(const PlainText& min_bound, const PlainText& max_bound) const;
         PlainText add_plaintexts(const PlainText &pt1, const PlainText &pt2) const;
         PlainText multiply_plaintexts(const PlainText &pt1, const PlainText &pt2) const;
         Tensor<PlainText *> add_plaintext_tensors(const Tensor<PlainText *> &pt1, const Tensor<PlainText *> &pt2) const;
@@ -120,20 +119,20 @@ namespace CoFHE
         String serialize_public_key(const PublicKey &pk) const;
         String serialize_plaintext(const PlainText &pt) const;
         String serialize_ciphertext(const CipherText &ct) const;
-        String serialize_part_decryption_result(const PartDecryptionResult &pdr) const;
+        String serialize_partial_decryption_result(const PartialDecryptionResult &pdr) const;
         String serialize_plaintext_tensor(const Tensor<PlainText *> &pt_cpu) const;
         String serialize_ciphertext_tensor(const Tensor<CipherText *> &ct_cpu) const;
-        String serialize_part_decryption_result_tensor(const Tensor<PartDecryptionResult *> &pdr_cpu) const;
+        String serialize_partial_decryption_result_tensor(const Tensor<PartialDecryptionResult *> &pdr_cpu) const;
         static CPUCryptoSystem deserialize(const String &data);
         SecretKey deserialize_secret_key(const String &data) const;
         SecretKeyShare deserialize_secret_key_share(const String &data) const;
         PublicKey deserialize_public_key(const String &data) const;
         PlainText deserialize_plaintext(const String &data) const;
         CipherText deserialize_ciphertext(const String &data) const;
-        PartDecryptionResult deserialize_part_decryption_result(const String &data) const;
+        PartialDecryptionResult deserialize_partial_decryption_result(const String &data) const;
         Tensor<PlainText *> deserialize_plaintext_tensor(const String &data) const;
         Tensor<CipherText *> deserialize_ciphertext_tensor(const String &data) const;
-        Tensor<PartDecryptionResult *> deserialize_part_decryption_result_tensor(const String &data) const;
+        Tensor<PartialDecryptionResult *> deserialize_partial_decryption_result_tensor(const String &data) const;
 
         BICYCL::RandGen &get_rand_gen() { return rand_gen; }
         const BICYCL::CL_HSM2k &get_hsm2k() const { return hsm2k; }

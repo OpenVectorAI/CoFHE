@@ -32,27 +32,27 @@ inline Tensor<CPUCryptoSystem::PlainText *> CPUCryptoSystem::decrypt_tensor(cons
     return pt_cpu;
 };
 
-inline Tensor<CPUCryptoSystem::PartDecryptionResult *> CPUCryptoSystem::part_decrypt_tensor(const CPUCryptoSystem::SecretKeyShare &sks_cpu, const Tensor<CPUCryptoSystem::CipherText *> &ct_cpu) const
+inline Tensor<CPUCryptoSystem::PartialDecryptionResult *> CPUCryptoSystem::part_decrypt_tensor(const CPUCryptoSystem::SecretKeyShare &sks_cpu, const Tensor<CPUCryptoSystem::CipherText *> &ct_cpu) const
 {
-    Tensor<CPUCryptoSystem::PartDecryptionResult *> pdr_cpu(ct_cpu.shape(), nullptr);
+    Tensor<CPUCryptoSystem::PartialDecryptionResult *> pdr_cpu(ct_cpu.shape(), nullptr);
     auto ct_cpu_flattened = ct_cpu;
     ct_cpu_flattened.flatten();
     pdr_cpu.flatten();
     CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0; i < ct_cpu.num_elements(); i++)
     {
-        pdr_cpu[i] = new CPUCryptoSystem::PartDecryptionResult(this->part_decrypt(sks_cpu, *ct_cpu_flattened[i]));
+        pdr_cpu[i] = new CPUCryptoSystem::PartialDecryptionResult(this->part_decrypt(sks_cpu, *ct_cpu_flattened[i]));
     }
     pdr_cpu.reshape(ct_cpu.shape());
     return pdr_cpu;
 };
 
-inline Tensor<CPUCryptoSystem::PlainText *> CPUCryptoSystem::combine_part_decryption_results_tensor(const Tensor<CPUCryptoSystem::CipherText *> &ct_cpu,
-                                                                                                    const Vector<Tensor<CPUCryptoSystem::PartDecryptionResult *>> &pdrs_cpu) const
+inline Tensor<CPUCryptoSystem::PlainText *> CPUCryptoSystem::combine_partial_decryption_results_tensor(const Tensor<CPUCryptoSystem::CipherText *> &ct_cpu,
+                                                                                                    const Vector<Tensor<CPUCryptoSystem::PartialDecryptionResult *>> &pdrs_cpu) const
 {
     Tensor<CPUCryptoSystem::PlainText *> pt_cpu(pdrs_cpu[0].shape(), nullptr);
     auto ct_cpu_flattened = ct_cpu;
     ct_cpu_flattened.flatten();
-    Vector<Tensor<CPUCryptoSystem::PartDecryptionResult *>> pdrs_cpu_flattened;
+    Vector<Tensor<CPUCryptoSystem::PartialDecryptionResult *>> pdrs_cpu_flattened;
     for (size_t i = 0; i < pdrs_cpu.size(); i++)
     {
         pdrs_cpu_flattened.push_back(pdrs_cpu[i]);
@@ -61,12 +61,12 @@ inline Tensor<CPUCryptoSystem::PlainText *> CPUCryptoSystem::combine_part_decryp
     pt_cpu.flatten();
     CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0; i < ct_cpu.num_elements(); i++)
     {
-        Vector<CPUCryptoSystem::PartDecryptionResult> pdrs_vec(pdrs_cpu.size());
+        Vector<CPUCryptoSystem::PartialDecryptionResult> pdrs_vec(pdrs_cpu.size());
         for (size_t j = 0; j < pdrs_cpu.size(); j++)
         {
             pdrs_vec[j] = *pdrs_cpu_flattened[j][i];
         }
-        pt_cpu[i] = new CPUCryptoSystem::PlainText(this->combine_part_decryption_results(*ct_cpu_flattened[i], pdrs_vec));
+        pt_cpu[i] = new CPUCryptoSystem::PlainText(this->combine_partial_decryption_results(*ct_cpu_flattened[i], pdrs_vec));
     }
     pt_cpu.reshape(pdrs_cpu[0].shape());
     return pt_cpu;

@@ -308,12 +308,12 @@ inline Vector<Vector<CPUCryptoSystem::SecretKeyShare>> CPUCryptoSystem::keygen(c
     return secret_key_shares;
 }
 
-inline CPUCryptoSystem::PartDecryptionResult CPUCryptoSystem::part_decrypt(const CPUCryptoSystem::SecretKeyShare &sks, const CPUCryptoSystem::CipherText &ct) const
+inline CPUCryptoSystem::PartialDecryptionResult CPUCryptoSystem::part_decrypt(const CPUCryptoSystem::SecretKeyShare &sks, const CPUCryptoSystem::CipherText &ct) const
 {
     return partDecrypt(hsm2k, ct, sks);
 }
 
-inline CPUCryptoSystem::PlainText CPUCryptoSystem::combine_part_decryption_results(const CPUCryptoSystem::CipherText &ct, const Vector<CPUCryptoSystem::PartDecryptionResult> &pdrs) const
+inline CPUCryptoSystem::PlainText CPUCryptoSystem::combine_partial_decryption_results(const CPUCryptoSystem::CipherText &ct, const Vector<CPUCryptoSystem::PartialDecryptionResult> &pdrs) const
 {
     return this->to_mpz(finalDecrypt(hsm2k, ct, pdrs));
 }

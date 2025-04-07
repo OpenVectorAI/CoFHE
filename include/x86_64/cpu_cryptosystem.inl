@@ -33,21 +33,12 @@ CPUCryptoSystem::scal_ciphertext(const CPUCryptoSystem::PublicKey& pk,
     return hsm2k.scal_ciphertexts(pk, ct, s, rand_gen);
 }
 
-inline CPUCryptoSystem::PlainText
-CPUCryptoSystem::generate_random_plaintext() const {
-    return BICYCL::Mpz{rand_gen.random_mpz(hsm2k.cleartext_bound())};
-}
-
-inline Vector<CPUCryptoSystem::PlainText>
-CPUCryptoSystem::generate_random_beavers_triplet() const {
-    Vector<CPUCryptoSystem::PlainText> res;
-    // the second must be in the less than clear text bound divided by first
-    // plaintext this will make the multiplication of the two plaintexts to be
-    // in the clear text bound can cause overflow if the k is less than 20
-    auto bound = BICYCL::Mpz{(unsigned long)(10)};
-    res.push_back(BICYCL::Mpz{rand_gen.random_mpz(bound)});
-    res.push_back(BICYCL::Mpz{rand_gen.random_mpz(bound)});
-    res.push_back(multiply_plaintexts(res[0], res[1]));
+inline CPUCryptoSystem::PlainText CPUCryptoSystem::generate_random_plaintext(
+    const CPUCryptoSystem::PlainText& min_bound,
+    const CPUCryptoSystem::PlainText& max_bound) const {
+    BICYCL::Mpz res, diff;
+    BICYCL::Mpz::sub(diff, max_bound, min_bound);
+    BICYCL::Mpz::add(res, min_bound, rand_gen.random_mpz(diff));
     return res;
 }
 
@@ -149,102 +140,190 @@ inline CPUCryptoSystem CPUCryptoSystem::deserialize(const String& data) {
     return CPUCryptoSystem(sec_level, k, compact_variant);
 }
 
+inline std::string serialize_bicycl_mpz_binary(const BICYCL::Mpz& mpz) {
+    // first byte represents the sign
+    uint32_t num_bytes = (static_cast<uint32_t>(
+        (mpz_sizeinbase(static_cast<mpz_srcptr>(mpz), 2) + 7) / 8));
+
+    std::string ss(num_bytes + 1, 0);
+    char* data_ptr = ss.data();
+    // write the sign
+    char sign = mpz.sgn() == 1 ? 0 : 1;
+    memcpy(data_ptr, &sign, sizeof(char));
+    data_ptr += sizeof(char);
+    // write the data
+    mpz_export(data_ptr, NULL, -1, 1, -1, 0, (mpz_srcptr)(mpz));
+    return ss;
+}
+
+inline BICYCL::Mpz deserialize_bicycl_mpz_binary(const String& data) {
+    uint32_t num_bytes = data.size() - 1;
+    const char* data_ptr = data.data();
+    char sign;
+    memcpy(&sign, data_ptr, sizeof(char));
+    data_ptr += sizeof(char);
+    mpz_t mpz;
+    mpz_init(mpz);
+    mpz_import(mpz, num_bytes, -1, 1, -1, 0, data_ptr);
+    BICYCL::Mpz b_mpz(std::move(mpz));
+    if (sign == 1) {
+        b_mpz.neg();
+    }
+    return b_mpz;
+}
+
+inline std::string serialize_bicycl_qfi_binary(const BICYCL::QFI& qfi) {
+    // first 8 bytes are used to hold offsets and signs
+    // first 3 bit represent the sign of a, b, c
+    // the next 30 bits hold the size of a
+    // the next 30 bits hold the size of b
+    // the last bit is unused
+    uint32_t bytes_in_a =
+        (mpz_sizeinbase(static_cast<mpz_srcptr>(qfi.a()), 2) + 7) / 8;
+    uint32_t bytes_in_b =
+        (mpz_sizeinbase(static_cast<mpz_srcptr>(qfi.b()), 2) + 7) / 8;
+    uint32_t bytes_in_c =
+        (mpz_sizeinbase(static_cast<mpz_srcptr>(qfi.c()), 2) + 7) / 8;
+    uint64_t num_bytes =
+        sizeof(uint64_t) + bytes_in_a + bytes_in_b + bytes_in_c;
+    std::string ss(num_bytes, 0);
+    char* data_ptr = ss.data();
+    uint64_t table = (static_cast<uint64_t>(qfi.a().sgn() == 1 ? 0 : 1) << 63) |
+                     (static_cast<uint64_t>(qfi.b().sgn() == 1 ? 0 : 1) << 62) |
+                     (static_cast<uint64_t>(qfi.c().sgn() == 1 ? 0 : 1) << 61) |
+                     (static_cast<uint64_t>(bytes_in_a) << 31) |
+                     (static_cast<uint64_t>(bytes_in_b) << 1);
+    memcpy(data_ptr, &table, sizeof(uint64_t));
+    data_ptr += sizeof(uint64_t);
+    // write the data
+    mpz_export(data_ptr, NULL, -1, 1, -1, 0, static_cast<mpz_srcptr>(qfi.a()));
+    data_ptr += bytes_in_a;
+    mpz_export(data_ptr, NULL, -1, 1, -1, 0, static_cast<mpz_srcptr>(qfi.b()));
+    data_ptr += bytes_in_b;
+    mpz_export(data_ptr, NULL, -1, 1, -1, 0, static_cast<mpz_srcptr>(qfi.c()));
+    return ss;
+}
+
+inline BICYCL::QFI deserialize_bicycl_qfi_binary(const String& data) {
+    uint64_t table;
+    const char* data_ptr = data.data();
+    memcpy(&table, data_ptr, sizeof(uint64_t));
+    data_ptr += sizeof(uint64_t);
+    bool is_a_neg = static_cast<bool>(table & (static_cast<uint64_t>(1) << 63));
+    bool is_b_neg = static_cast<bool>(table & (static_cast<uint64_t>(1) << 62));
+    bool is_c_neg = static_cast<bool>(table & (static_cast<uint64_t>(1) << 61));
+    uint32_t bytes_in_a =
+        static_cast<uint32_t>(table >> 31) & 0x3FFFFFFF; // 60-31st
+    uint32_t bytes_in_b =
+        static_cast<uint32_t>(table >> 1) & 0x3FFFFFFF; // 30-1st
+    uint32_t bytes_in_c =
+        data.size() - sizeof(uint64_t) - bytes_in_a - bytes_in_b;
+
+    mpz_t a, b, c;
+    mpz_init(a);
+    mpz_init(b);
+    mpz_init(c);
+    mpz_import(a, bytes_in_a, -1, 1, -1, 0, data_ptr);
+    data_ptr += bytes_in_a;
+    mpz_import(b, bytes_in_b, -1, 1, -1, 0, data_ptr);
+    data_ptr += bytes_in_b;
+    mpz_import(c, bytes_in_c, -1, 1, -1, 0, data_ptr);
+    BICYCL::Mpz b_a(std::move(a)), b_b(std::move(b)), b_c(std::move(c));
+    if (is_a_neg) {
+        b_a.neg();
+    }
+    if (is_b_neg) {
+        b_b.neg();
+    }
+    if (is_c_neg) {
+        b_c.neg();
+    }
+    BICYCL::QFI qfi(std::move(b_a), std::move(b_b), std::move(b_c));
+    return qfi;
+}
+
 inline String CPUCryptoSystem::serialize_secret_key(
     const CPUCryptoSystem::SecretKey& sk) const {
-    std::stringstream ss;
-    ss << sk;
-    return ss.str();
+    return serialize_bicycl_mpz_binary(static_cast<BICYCL::Mpz>(sk));
 }
 
 inline CPUCryptoSystem::SecretKey
 CPUCryptoSystem::deserialize_secret_key(const String& data) const {
-    std::stringstream ss{data};
-    BICYCL::Mpz sk;
-    ss >> sk;
-    return CPUCryptoSystem::SecretKey(hsm2k, sk);
+    return CPUCryptoSystem::SecretKey(this->hsm2k,
+                                      deserialize_bicycl_mpz_binary(data));
 }
 
 inline String CPUCryptoSystem::serialize_secret_key_share(
     const CPUCryptoSystem::SecretKeyShare& sks) const {
-    std::stringstream ss;
-    ss << sks;
-    return ss.str();
+    return serialize_bicycl_mpz_binary(sks);
 }
 
 inline CPUCryptoSystem::SecretKeyShare
 CPUCryptoSystem::deserialize_secret_key_share(const String& data) const {
-    std::stringstream ss{data};
-    BICYCL::Mpz sks;
-    ss >> sks;
-    return sks;
+    return deserialize_bicycl_mpz_binary(data);
 }
 
 inline String CPUCryptoSystem::serialize_public_key(
     const CPUCryptoSystem::PublicKey& pk) const {
-    std::stringstream ss;
-    ss << pk.elt().a() << " " << pk.elt().b() << " " << pk.elt().c();
-    return ss.str();
+    return serialize_bicycl_qfi_binary(pk.elt());
 }
 
 inline CPUCryptoSystem::PublicKey
 CPUCryptoSystem::deserialize_public_key(const String& data) const {
-    std::stringstream ss{data};
-    std::string a_str, b_str, c_str;
-    ss >> a_str >> b_str >> c_str;
-    return CPUCryptoSystem::PublicKey(hsm2k, BICYCL::QFI{BICYCL::Mpz{a_str},
-                                                         BICYCL::Mpz{b_str},
-                                                         BICYCL::Mpz{c_str}});
+    return CPUCryptoSystem::PublicKey(hsm2k,
+                                      deserialize_bicycl_qfi_binary(data));
 }
 
 inline String CPUCryptoSystem::serialize_plaintext(
     const CPUCryptoSystem::PlainText& s) const {
-    std::stringstream ss;
-    ss << s;
-    return ss.str();
+    return serialize_bicycl_mpz_binary(s);
 }
 
 inline CPUCryptoSystem::PlainText
 CPUCryptoSystem::deserialize_plaintext(const String& data) const {
-    std::stringstream ss{data};
-    BICYCL::Mpz s;
-    ss >> s;
-    return s;
+    return deserialize_bicycl_mpz_binary(data);
 }
 
 inline String CPUCryptoSystem::serialize_ciphertext(
     const CPUCryptoSystem::CipherText& ct) const {
-    std::stringstream ss;
-    ss << ct.c1().a() << " " << ct.c1().b() << " " << ct.c1().c() << " "
-       << ct.c2().a() << " " << ct.c2().b() << " " << ct.c2().c();
-    return ss.str();
+    // first 8 bytes represent the size of first qfi
+    // this implementation can be optimised further if needed
+    std::string c1 = serialize_bicycl_qfi_binary(ct.c1());
+    std::string c2 = serialize_bicycl_qfi_binary(ct.c2());
+    size_t data_size = sizeof(uint64_t) + c1.size() + c2.size();
+    std::string data(data_size, 0);
+    char* data_ptr = data.data();
+    uint64_t size_of_c1 = c1.size();
+    memcpy(data_ptr, &size_of_c1, sizeof(uint64_t));
+    data_ptr += sizeof(uint64_t);
+    memcpy(data_ptr, c1.data(), c1.size());
+    data_ptr += c1.size();
+    memcpy(data_ptr, c2.data(), c2.size());
+    return data;
 }
 
 inline CPUCryptoSystem::CipherText
 CPUCryptoSystem::deserialize_ciphertext(const String& data) const {
-    std::stringstream ss{data};
-    std::string c1_a_str, c1_b_str, c1_c_str, c2_a_str, c2_b_str, c2_c_str;
-    ss >> c1_a_str >> c1_b_str >> c1_c_str >> c2_a_str >> c2_b_str >> c2_c_str;
-    return CPUCryptoSystem::CipherText(
-        BICYCL::QFI{BICYCL::Mpz{c1_a_str}, BICYCL::Mpz{c1_b_str},
-                    BICYCL::Mpz{c1_c_str}},
-        BICYCL::QFI{BICYCL::Mpz{c2_a_str}, BICYCL::Mpz{c2_b_str},
-                    BICYCL::Mpz{c2_c_str}});
+    uint64_t size_of_c1;
+    const char* data_ptr = data.data();
+    memcpy(&size_of_c1, data_ptr, sizeof(uint64_t));
+    data_ptr += sizeof(uint64_t);
+    std::string c1_str(data_ptr, size_of_c1);
+    data_ptr += size_of_c1;
+    std::string c2_str(data_ptr, data.size() - size_of_c1 - sizeof(uint64_t));
+    BICYCL::QFI c1 = deserialize_bicycl_qfi_binary(c1_str);
+    BICYCL::QFI c2 = deserialize_bicycl_qfi_binary(c2_str);
+    return CPUCryptoSystem::CipherText(std::move(c1), std::move(c2));
 }
 
-inline String CPUCryptoSystem::serialize_part_decryption_result(
-    const CPUCryptoSystem::PartDecryptionResult& pdr) const {
-    std::stringstream ss;
-    ss << pdr.a() << " " << pdr.b() << " " << pdr.c();
-    return ss.str();
+inline String CPUCryptoSystem::serialize_partial_decryption_result(
+    const CPUCryptoSystem::PartialDecryptionResult& pdr) const {
+    return serialize_bicycl_qfi_binary(pdr);
 }
 
-inline CPUCryptoSystem::PartDecryptionResult
-CPUCryptoSystem::deserialize_part_decryption_result(const String& data) const {
-    std::stringstream ss{data};
-    std::string a_str, b_str, c_str;
-    ss >> a_str >> b_str >> c_str;
-    return CPUCryptoSystem::PartDecryptionResult{
-        BICYCL::Mpz{a_str}, BICYCL::Mpz{b_str}, BICYCL::Mpz{c_str}};
+inline CPUCryptoSystem::PartialDecryptionResult
+CPUCryptoSystem::deserialize_partial_decryption_result(const String& data) const {
+    return deserialize_bicycl_qfi_binary(data);
 }
 
 inline String CPUCryptoSystem::serialize_plaintext_tensor(
@@ -260,7 +339,7 @@ inline String CPUCryptoSystem::serialize_plaintext_tensor(
                                               ? ((uint64_t)(1) << 63)
                                               : (uint64_t)(0)));
         last_offset +=
-            mpz_sizeinbase((mpz_srcptr)(cpu_flattened.at(i)), 2) / 8 + 1;
+            (mpz_sizeinbase((mpz_srcptr)(cpu_flattened.at(i)), 2) + 7) / 8;
     }
     data_size += last_offset;
     std::string data(data_size, 0);
@@ -372,54 +451,54 @@ inline String CPUCryptoSystem::serialize_ciphertext_tensor(
                                 : (uint64_t)(0)));
         // last_offset += ct_cpu_flattened.at(i)->c1().a().nlimbs() * limb_size;
         last_offset +=
-            mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c1().a()), 2) /
-                8 +
-            1;
+            (mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c1().a()), 2) +
+             7) /
+            8;
         data_offsets[i * 6 + 1] =
             last_offset | ((ct_cpu_flattened.at(i)->c1().b().sgn() != 1
                                 ? ((uint64_t)(1) << 63)
                                 : (uint64_t)(0)));
         // last_offset += ct_cpu_flattened.at(i)->c1().b().nlimbs() * limb_size;
         last_offset +=
-            mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c1().b()), 2) /
-                8 +
-            1;
+            (mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c1().b()), 2) +
+             7) /
+            8;
         data_offsets[i * 6 + 2] =
             last_offset | ((ct_cpu_flattened.at(i)->c1().c().sgn() != 1
                                 ? ((uint64_t)(1) << 63)
                                 : (uint64_t)(0)));
         // last_offset += ct_cpu_flattened.at(i)->c1().c().nlimbs() * limb_size;
         last_offset +=
-            mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c1().c()), 2) /
-                8 +
-            1;
+            (mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c1().c()), 2) +
+             7) /
+            8;
         data_offsets[i * 6 + 3] =
             last_offset | ((ct_cpu_flattened.at(i)->c2().a().sgn() != 1
                                 ? ((uint64_t)(1) << 63)
                                 : (uint64_t)(0)));
         // last_offset += ct_cpu_flattened.at(i)->c2().a().nlimbs() * limb_size;
         last_offset +=
-            mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c2().a()), 2) /
-                8 +
-            1;
+            (mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c2().a()), 2) +
+             7) /
+            8;
         data_offsets[i * 6 + 4] =
             last_offset | ((ct_cpu_flattened.at(i)->c2().b().sgn() != 1
                                 ? ((uint64_t)(1) << 63)
                                 : (uint64_t)(0)));
         // last_offset += ct_cpu_flattened.at(i)->c2().b().nlimbs() * limb_size;
         last_offset +=
-            mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c2().b()), 2) /
-                8 +
-            1;
+            (mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c2().b()), 2) +
+             7) /
+            8;
         data_offsets[i * 6 + 5] =
             last_offset | ((ct_cpu_flattened.at(i)->c2().c().sgn() != 1
                                 ? ((uint64_t)(1) << 63)
                                 : (uint64_t)(0)));
         // last_offset += ct_cpu_flattened.at(i)->c2().c().nlimbs() * limb_size;
         last_offset +=
-            mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c2().c()), 2) /
-                8 +
-            1;
+            (mpz_sizeinbase((mpz_srcptr)(ct_cpu_flattened.at(i)->c2().c()), 2) +
+             7) /
+            8;
     }
     data_size += last_offset;
     std::string data(data_size, 0);
@@ -648,8 +727,8 @@ CPUCryptoSystem::deserialize_ciphertext_tensor(const String& data) const {
     return ciphertexts;
 }
 
-inline String CPUCryptoSystem::serialize_part_decryption_result_tensor(
-    const Tensor<CPUCryptoSystem::PartDecryptionResult*>& pdr_cpu) const {
+inline String CPUCryptoSystem::serialize_partial_decryption_result_tensor(
+    const Tensor<CPUCryptoSystem::PartialDecryptionResult*>& pdr_cpu) const {
     uint32_t ndim = pdr_cpu.ndim();
     auto pdr_cpu_flattened = pdr_cpu;
     pdr_cpu_flattened.flatten();
@@ -663,22 +742,25 @@ inline String CPUCryptoSystem::serialize_part_decryption_result_tensor(
             ((pdr_cpu_flattened.at(i)->a().sgn() != 1 ? ((uint64_t)(1) << 63)
                                                       : (uint64_t)(0)));
         last_offset +=
-            mpz_sizeinbase((mpz_srcptr)(pdr_cpu_flattened.at(i)->a()), 2) / 8 +
-            1;
+            (mpz_sizeinbase((mpz_srcptr)(pdr_cpu_flattened.at(i)->a()), 2) +
+             7) /
+            8;
         data_offsets[i * 3 + 1] =
             last_offset |
             ((pdr_cpu_flattened.at(i)->b().sgn() != 1 ? ((uint64_t)(1) << 63)
                                                       : (uint64_t)(0)));
         last_offset +=
-            mpz_sizeinbase((mpz_srcptr)(pdr_cpu_flattened.at(i)->b()), 2) / 8 +
-            1;
+            (mpz_sizeinbase((mpz_srcptr)(pdr_cpu_flattened.at(i)->b()), 2) +
+             7) /
+            8;
         data_offsets[i * 3 + 2] =
             last_offset |
             ((pdr_cpu_flattened.at(i)->c().sgn() != 1 ? ((uint64_t)(1) << 63)
                                                       : (uint64_t)(0)));
         last_offset +=
-            mpz_sizeinbase((mpz_srcptr)(pdr_cpu_flattened.at(i)->c()), 2) / 8 +
-            1;
+            (mpz_sizeinbase((mpz_srcptr)(pdr_cpu_flattened.at(i)->c()), 2) +
+             7) /
+            8;
     }
     data_size += last_offset;
     std::string data(data_size, 0);
@@ -715,8 +797,8 @@ inline String CPUCryptoSystem::serialize_part_decryption_result_tensor(
     return data;
 }
 
-inline Tensor<CPUCryptoSystem::PartDecryptionResult*>
-CPUCryptoSystem::deserialize_part_decryption_result_tensor(
+inline Tensor<CPUCryptoSystem::PartialDecryptionResult*>
+CPUCryptoSystem::deserialize_partial_decryption_result_tensor(
     const String& data) const {
     uint32_t ndim;
     const char* data_ptr = data.data();
@@ -737,7 +819,7 @@ CPUCryptoSystem::deserialize_part_decryption_result_tensor(
     }
 
     std::vector<size_t> shape_vec(shape.begin(), shape.end());
-    Tensor<CPUCryptoSystem::PartDecryptionResult*> part_decryption_results(
+    Tensor<CPUCryptoSystem::PartialDecryptionResult*> part_decryption_results(
         shape_vec, nullptr);
     part_decryption_results.flatten();
 
@@ -775,7 +857,7 @@ CPUCryptoSystem::deserialize_part_decryption_result_tensor(
             c_m.neg();
         }
         part_decryption_results.at(i) =
-            new CPUCryptoSystem::PartDecryptionResult{
+            new CPUCryptoSystem::PartialDecryptionResult{
                 BICYCL::Mpz{a_m}, BICYCL::Mpz{b_m}, BICYCL::Mpz{c_m}};
     }
     {
@@ -818,7 +900,7 @@ CPUCryptoSystem::deserialize_part_decryption_result_tensor(
             c_m.neg();
         }
         part_decryption_results.at(num_elements - 1) =
-            new CPUCryptoSystem::PartDecryptionResult{
+            new CPUCryptoSystem::PartialDecryptionResult{
                 BICYCL::Mpz{a_m}, BICYCL::Mpz{b_m}, BICYCL::Mpz{c_m}};
     }
     part_decryption_results.reshape(shape_vec);

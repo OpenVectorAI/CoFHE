@@ -5,19 +5,27 @@
 
 namespace CoFHE
 {
-    template <typename CryptoSystem>
+    template <typename CryptoSystem, typename PKCEncryptor>
     class SMPCCipherTextMultiplier
     {
     public:
         using CipherText = typename CryptoSystem::CipherText;
 
-        SMPCCipherTextMultiplier(SMPCClient<CryptoSystem> &client) : client_m(client) {}
+        SMPCCipherTextMultiplier(SMPCClient<CryptoSystem,PKCEncryptor> &client) : client_m(client) {}
 
         CipherText multiply_ciphertexts(CipherText ct1, CipherText ct2)
         {
             auto triplets = client_m.get_beavers_triplets(1);
             auto a = *triplets.at(0, 0);
             auto b = *triplets.at(0, 1);
+            // for debugging
+            auto decrypted_a = client_m.decrypt(a);
+            auto decrypted_b = client_m.decrypt(b);
+            auto decrypted_c = client_m.decrypt(*triplets.at(0, 2));
+            std::cout << "Decrypted a: " << client_m.crypto_system().get_float_from_plaintext(decrypted_a) << std::endl;
+            std::cout << "Decrypted b: " << client_m.crypto_system().get_float_from_plaintext(decrypted_b) << std::endl;
+            std::cout << "Decrypted c: " << client_m.crypto_system().get_float_from_plaintext(decrypted_c) << std::endl;
+
             auto neg_a = client_m.crypto_system().negate_ciphertext(client_m.network_public_key(), a);
             auto neg_b = client_m.crypto_system().negate_ciphertext(client_m.network_public_key(), b);
             auto c = *triplets.at(0, 2);
@@ -35,6 +43,11 @@ namespace CoFHE
             delete triplets.at(0, 0);
             delete triplets.at(0, 1);
             delete triplets.at(0, 2);
+
+            // for debugging
+            auto decrypted = client_m.decrypt(ct);
+            std::cout << "Decrypted result: " << client_m.crypto_system().get_float_from_plaintext(decrypted) << std::endl;
+
             return ct;
         }
 
@@ -160,7 +173,7 @@ namespace CoFHE
         }
 
     private:
-        SMPCClient<CryptoSystem> &client_m;
+        SMPCClient<CryptoSystem,PKCEncryptor> &client_m;
     };
 } // namespace CoFHE
 

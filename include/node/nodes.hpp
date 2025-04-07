@@ -11,7 +11,7 @@
 #include "node/setup_node_request_handler.hpp"
 namespace CoFHE {
 
-template <typename CryptoSystem>
+template <typename CryptoSystem, typename PKCEncryptor>
 auto make_compute_node(
     const NodeDetails& self_details, const NodeDetails& setup_node,
     const std::string& setup_node_cert_path = "./server.pem",
@@ -46,19 +46,19 @@ auto make_compute_node(
         NetworkDetailsResponse::from_string(res->data()).data());
     network_details.self_node() = self_details;
     delete res;
-    return Network::Server<ComputeRequestHandler<CryptoSystem>, ComputeRequest,
-                           ComputeResponse>(
+    return Network::Server<ComputeRequestHandler<CryptoSystem, PKCEncryptor>,
+                           ComputeRequest, ComputeResponse>(
         self_details.ip, self_details.port,
-        ComputeRequestHandler<CryptoSystem>(network_details),
+        ComputeRequestHandler<CryptoSystem, PKCEncryptor>(network_details),
         compute_node_cert_path, compute_node_key_path);
 }
 
-template <typename CryptoSystem>
-auto make_cofhe_node(const NodeDetails& self_details,
-                     const NodeDetails& setup_node,
-                     const std::string& setup_node_cert_path = "./server.pem",
-                     const std::string& cofhe_node_cert_path = "./server.pem",
-                     const std::string& cofhe_node_key_path = "./server_key.pem") {
+template <typename CryptoSystem, typename PKCEncryptor>
+auto make_cofhe_node(
+    const NodeDetails& self_details, const NodeDetails& setup_node,
+    const std::string& setup_node_cert_path = "./server.pem",
+    const std::string& cofhe_node_cert_path = "./server.pem",
+    const std::string& cofhe_node_key_path = "./server_key.pem") {
     auto setup_node_client = Network::Client(setup_node.ip, setup_node.port,
                                              setup_node_cert_path, true);
     SetupNodeRequest req = SetupNodeRequest(
@@ -92,22 +92,24 @@ auto make_cofhe_node(const NodeDetails& self_details,
     network_details.self_node() = self_details;
     network_details.secret_key_shares() = sk_shares;
     delete res;
-    return Network::Server<CoFHENodeRequestHandler<CryptoSystem>,
+    return Network::Server<CoFHENodeRequestHandler<CryptoSystem, PKCEncryptor>,
                            CoFHENodeRequest, CoFHENodeResponse>(
         self_details.ip, self_details.port,
-        CoFHENodeRequestHandler<CryptoSystem>(network_details));
+        CoFHENodeRequestHandler<CryptoSystem, PKCEncryptor>(network_details));
 }
 
 template <typename CryptoSystem>
 auto make_setup_node(const NodeDetails& self_details,
                      const CryptoSystemDetails& cs,
+                     const ReencryptorDetails& reencryptor_details,
                      const std::string& cert_path = "./server.pem",
                      const std::string& key_path = "./server_key.pem") {
     return Network::Server<SetupNodeRequestHandler<CryptoSystem>,
                            SetupNodeRequest, SetupNodeResponse>(
         self_details.ip, self_details.port,
-        SetupNodeRequestHandler<CryptoSystem>(self_details, cs), cert_path,
-        key_path);
+        SetupNodeRequestHandler<CryptoSystem>(self_details, cs,
+                                              reencryptor_details),
+        cert_path, key_path);
 }
 } // namespace CoFHE
 

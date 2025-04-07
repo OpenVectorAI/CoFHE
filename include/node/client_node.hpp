@@ -4,19 +4,28 @@
 #include "node/client.hpp"
 #include "node/compute_request_handler.hpp"
 #include "node/network_details.hpp"
+#include "node/reencryptor_factory.hpp"
+#include "smpc/reencryption.hpp"
+#include "utils/rsa.hpp"
 
 namespace CoFHE {
+// for now only RSAPKCEncryptor
 template <typename CryptoSystem> class ClientNode {
   public:
+    using ReencryptorType =
+        PartialDecryptionResultReencryption<RSAPKCEncryptor, CryptoSystem>;
     ClientNode(const NetworkDetails& network_details,
                const std::string& cert_path = "./server.pem")
         : network_details_m(network_details),
-          crypto_system_m(CryptoSystem(
+          cryptosystem_m(CryptoSystem(
               network_details.cryptosystem_details().security_level,
               network_details.cryptosystem_details().k)),
-          network_public_key_m(crypto_system_m.deserialize_public_key(
+          network_public_key_m(cryptosystem_m.deserialize_public_key(
               network_details.cryptosystem_details().public_key)),
-          cert_path_m(cert_path) {
+          cert_path_m(cert_path),
+          reencryptor_m(make_reencryptor<RSAPKCEncryptor>(
+                            network_details.reencryption_details()),
+                        cryptosystem_m) {
         init();
     }
 
@@ -24,21 +33,24 @@ template <typename CryptoSystem> class ClientNode {
         client_m->run(Network::ServiceType::COMPUTE_REQUEST, request, response);
     }
 
-    CryptoSystem& crypto_system() { return crypto_system_m; }
-    const CryptoSystem& crypto_system() const { return crypto_system_m; }
+    CryptoSystem& crypto_system() { return cryptosystem_m; }
+    const CryptoSystem& crypto_system() const { return cryptosystem_m; }
     typename CryptoSystem::PublicKey& network_public_key() {
         return network_public_key_m;
     }
     const typename CryptoSystem::PublicKey& network_public_key() const {
         return network_public_key_m;
     }
+    ReencryptorType& reencryptor() { return reencryptor_m; }
+    const ReencryptorType& reencryptor() const { return reencryptor_m; }
 
   private:
     NetworkDetails network_details_m;
-    CryptoSystem crypto_system_m;
+    CryptoSystem cryptosystem_m;
     typename CryptoSystem::PublicKey network_public_key_m;
     std::unique_ptr<Network::Client> client_m;
     std::string cert_path_m;
+    ReencryptorType reencryptor_m;
 
     void init() {
         for (const auto& node : network_details_m.nodes()) {

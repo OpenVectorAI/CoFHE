@@ -16,6 +16,18 @@ add_executable(vector_search vector_search.cpp)
 target_link_libraries(vector_search PRIVATE CoFHE)
 add_dependencies(cofhe_examples vector_search)
 
-add_executable(comparison comparison.cpp)
-target_link_libraries(comparison PRIVATE CoFHE)
-add_dependencies(cofhe_examples comparison)
+add_executable(binary_scheme binary_scheme.cpp)
+target_link_libraries(binary_scheme PRIVATE CoFHE)
+add_dependencies(cofhe_examples binary_scheme)
+
+add_executable(native_comparision native_comparision.cpp)
+target_link_libraries(native_comparision PRIVATE CoFHE)
+add_dependencies(cofhe_examples native_comparision) 
+
+add_executable(reencryption reencryption.cpp)
+target_link_libraries(reencryption PRIVATE CoFHE)
+add_dependencies(cofhe_examples reencryption)
+
+add_executable(transfer_sim transfer_sim.cpp)
+target_link_libraries(transfer_sim PRIVATE CoFHE)
+add_dependencies(cofhe_examples transfer_sim)

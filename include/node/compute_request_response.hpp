@@ -63,10 +63,17 @@ namespace CoFHE
         enum class ComputeOperation
         {
             DECRYPT,
+            REENCRYPT,
             ADD,
             SUBTRACT,
             MULTIPLY,
             DIVIDE,
+            LT,
+            GT,
+            EQ,
+            NEQ,
+            LTEQ,
+            GTEQ,
             // POLYNOMIAL_EVALUATION,
             // SMPC
         };

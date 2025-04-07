@@ -11,12 +11,12 @@
 #include "node/nodes.hpp"
 #include "node/client_node.hpp"
 #include "node/compute_request_response.hpp"
-#include "utils/binary_cpu_cryptosystem.hpp"
+#include "utils/binary_cryptosystem.hpp"
 
 namespace CoFHE
 {
-  template <typename CryptoSystemImpl, typename SecretKeyImpl, typename PublicKeyImpl, typename PlainTextImpl, typename CipherTextImpl, typename SecretKeyShareImpl, typename PartDecryptionResult>
-  concept CryptoSystemConcept = requires(CryptoSystemImpl cs, SecretKeyImpl sk, PublicKeyImpl pk, PlainTextImpl pt, CipherTextImpl ct, SecretKeyShareImpl sks, PartDecryptionResult pdr) {
+  template <typename CryptoSystemImpl, typename SecretKeyImpl, typename PublicKeyImpl, typename PlainTextImpl, typename CipherTextImpl, typename SecretKeyShareImpl, typename PartialDecryptionResult>
+  concept CryptoSystemConcept = requires(CryptoSystemImpl cs, SecretKeyImpl sk, PublicKeyImpl pk, PlainTextImpl pt, CipherTextImpl ct, SecretKeyShareImpl sks, PartialDecryptionResult pdr) {
     { cs.keygen() } -> std::same_as<SecretKeyImpl>;
     { cs.keygen(sk) } -> std::same_as<PublicKeyImpl>;
     // in sorted order per party
@@ -27,12 +27,12 @@ namespace CoFHE
     { cs.decrypt(sk, ct) } -> std::same_as<PlainTextImpl>;
     {cs.decrypt_vector(sk, Vector<CipherTextImpl>{})} -> std::same_as<Vector<PlainTextImpl>>;
     {cs.decrypt_tensor(sk, Tensor<CipherTextImpl>{})} -> std::same_as<Tensor<PlainTextImpl>>;
-    { cs.part_decrypt(SecretKeyShareImpl{}, ct) } -> std::same_as<PartDecryptionResult>;
-    {cs.part_decrypt_vector(SecretKeyShareImpl{}, Vector<CipherTextImpl>{})} -> std::same_as<Vector<PartDecryptionResult>>;
-    {cs.part_decrypt_tensor(SecretKeyShareImpl{}, Tensor<CipherTextImpl>{})} -> std::same_as<Tensor<PartDecryptionResult>>;
-    { cs.combine_part_decryption_results(ct, Vector<PartDecryptionResult>{}) } -> std::same_as<PlainTextImpl>;
-    {cs.combine_part_decryption_results_vector(ct, Vector<PartDecryptionResult>{})} -> std::same_as<Vector<PlainTextImpl>>;
-    {cs.combine_part_decryption_results_tensor(ct, Vector<Tensor<PartDecryptionResult>>{})} -> std::same_as<Tensor<PlainTextImpl>>;
+    { cs.part_decrypt(SecretKeyShareImpl{}, ct) } -> std::same_as<PartialDecryptionResult>;
+    {cs.part_decrypt_vector(SecretKeyShareImpl{}, Vector<CipherTextImpl>{})} -> std::same_as<Vector<PartialDecryptionResult>>;
+    {cs.part_decrypt_tensor(SecretKeyShareImpl{}, Tensor<CipherTextImpl>{})} -> std::same_as<Tensor<PartialDecryptionResult>>;
+    { cs.combine_partial_decryption_results(ct, Vector<PartialDecryptionResult>{}) } -> std::same_as<PlainTextImpl>;
+    {cs.combine_partial_decryption_results_vector(ct, Vector<PartialDecryptionResult>{})} -> std::same_as<Vector<PlainTextImpl>>;
+    {cs.combine_partial_decryption_results_tensor(ct, Vector<Tensor<PartialDecryptionResult>>{})} -> std::same_as<Tensor<PlainTextImpl>>;
     { cs.add_ciphertexts(pk, ct, ct) } -> std::same_as<CipherTextImpl>;
     { cs.scal_ciphertext(pk, pt, ct) } -> std::same_as<CipherTextImpl>;
     { cs.add_ciphertext_vectors(pk, Vector<CipherTextImpl>{}, Vector<CipherTextImpl>{}) } -> std::same_as<Vector<CipherTextImpl>>;
@@ -40,8 +40,7 @@ namespace CoFHE
     { cs.scal_ciphertext_vector(pk, Vector<PlainTextImpl>{}, Vector<CipherTextImpl>{}) } -> std::same_as<Vector<CipherTextImpl>>;
     { cs.add_ciphertext_tensors(pk, Tensor<CipherTextImpl>{}, Tensor<CipherTextImpl>{}) } -> std::same_as<Tensor<CipherTextImpl>>;
     {cs.scal_ciphertext_tensors(pk, Tensor<PlainTextImpl>{}, Tensor<CipherTextImpl>{})} -> std::same_as<Tensor<CipherTextImpl>>;
-    { cs.generate_random_plaintext() } -> std::same_as<PlainTextImpl>;
-    {cs.generate_random_beavers_triplet()} -> std::same_as<Vector<PlainTextImpl>>;
+    { cs.generate_random_plaintext(pt,pt) } -> std::same_as<PlainTextImpl>;
     {cs.add_plaintexts(pt, pt)} -> std::same_as<PlainTextImpl>;
     { cs.multiply_plaintexts(pt, pt) } -> std::same_as<PlainTextImpl>;
     {cs.add_plaintext_tensors(Tensor<PlainTextImpl>{}, Tensor<PlainTextImpl>{})} -> std::same_as<Tensor<PlainTextImpl>>;
@@ -58,20 +57,20 @@ namespace CoFHE
     { cs.serialize_public_key(pk) } -> std::same_as<String>;
     { cs.serialize_plaintext(pt) } -> std::same_as<String>;
     { cs.serialize_ciphertext(ct) } -> std::same_as<String>;
-    { cs.serialize_part_decryption_result(PartDecryptionResult{}) } -> std::same_as<String>;
+    { cs.serialize_partial_decryption_result(PartialDecryptionResult{}) } -> std::same_as<String>;
     { cs.serialize_plaintext_tensor(Tensor<PlainTextImpl>{}) } -> std::same_as<String>;
     { cs.serialize_ciphertext_tensor(Tensor<CipherTextImpl>{}) } -> std::same_as<String>;
-    { cs.serialize_part_decryption_result_tensor(Tensor<PartDecryptionResult>{}) } -> std::same_as<String>;
+    { cs.serialize_partial_decryption_result_tensor(Tensor<PartialDecryptionResult>{}) } -> std::same_as<String>;
     { CryptoSystemImpl::deserialize(String{}) } -> std::same_as<CryptoSystemImpl>;
     { cs.deserialize_secret_key(String{}) } -> std::same_as<SecretKeyImpl>;
     { cs.deserialize_secret_key_share(String{}) } -> std::same_as<SecretKeyShareImpl>;
     { cs.deserialize_public_key(String{}) } -> std::same_as<PublicKeyImpl>;
     { cs.deserialize_plaintext(String{}) } -> std::same_as<PlainTextImpl>;
     { cs.deserialize_ciphertext(String{}) } -> std::same_as<CipherTextImpl>;
-    { cs.deserialize_part_decryption_result(String{}) } -> std::same_as<PartDecryptionResult>;
+    { cs.deserialize_partial_decryption_result(String{}) } -> std::same_as<PartialDecryptionResult>;
     { cs.deserialize_plaintext_tensor(String{}) } -> std::same_as<Tensor<PlainTextImpl>>;
     { cs.deserialize_ciphertext_tensor(String{}) } -> std::same_as<Tensor<CipherTextImpl>>;
-    { cs.deserialize_part_decryption_result_tensor(String{}) } -> std::same_as<Tensor<PartDecryptionResult>>;
+    { cs.deserialize_partial_decryption_result_tensor(String{}) } -> std::same_as<Tensor<PartialDecryptionResult>>;
   };
 
   enum class Device

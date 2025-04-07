@@ -1,6 +1,8 @@
 #ifndef CoFHE_MACROS_HPP_INCLUDED
 #define CoFHE_MACROS_HPP_INCLUDED
 
+#include "common/openmp.hpp"
+
 #define CoFHE_FUNC_MACRO_CONCATENATE_IMPL(s1, s2) s1##s2
 #define CoFHE_FUNC_MACRO_CONCATENATE(s1, s2) CoFHE_FUNC_MACRO_CONCATENATE_IMPL(s1, s2)
 

@@ -28,29 +28,29 @@ inline Vector<CPUCryptoSystem::PlainText *> CPUCryptoSystem::decrypt_vector(cons
     return res_vec;
 }
 
-inline Vector<CPUCryptoSystem::PartDecryptionResult *> CPUCryptoSystem::part_decrypt_vector(const CPUCryptoSystem::SecretKeyShare &sks, const Vector<CPUCryptoSystem::CipherText *> &cts) const
+inline Vector<CPUCryptoSystem::PartialDecryptionResult *> CPUCryptoSystem::part_decrypt_vector(const CPUCryptoSystem::SecretKeyShare &sks, const Vector<CPUCryptoSystem::CipherText *> &cts) const
 {
-    Vector<CPUCryptoSystem::PartDecryptionResult *> res_vec(cts.size());
+    Vector<CPUCryptoSystem::PartialDecryptionResult *> res_vec(cts.size());
     CoFHE_PARALLEL_FOR_STATIC_SCHEDULE
     for (size_t i = 0; i < cts.size(); i++)
     {
-        res_vec[i] = new CPUCryptoSystem::PartDecryptionResult{part_decrypt(sks, *cts[i])};
+        res_vec[i] = new CPUCryptoSystem::PartialDecryptionResult{part_decrypt(sks, *cts[i])};
     }
     return res_vec;
 }
 
-inline Vector<CPUCryptoSystem::PlainText *> CPUCryptoSystem::combine_part_decryption_results_vector(const CPUCryptoSystem::CipherText &ct, const Vector<CPUCryptoSystem::PartDecryptionResult *> &pdrs) const
+inline Vector<CPUCryptoSystem::PlainText *> CPUCryptoSystem::combine_partial_decryption_results_vector(const CPUCryptoSystem::CipherText &ct, const Vector<CPUCryptoSystem::PartialDecryptionResult *> &pdrs) const
 {
     Vector<CPUCryptoSystem::PlainText *> res_vec(pdrs.size());
     CoFHE_PARALLEL_FOR_STATIC_SCHEDULE
     for (size_t i = 0; i < pdrs.size(); i++)
     {
-        Vector<CPUCryptoSystem::PartDecryptionResult> pdrs_vec{pdrs.size()};
+        Vector<CPUCryptoSystem::PartialDecryptionResult> pdrs_vec{pdrs.size()};
         for (size_t j = 0; j < pdrs.size(); j++)
         {
             pdrs_vec[j] = *pdrs[j];
         }
-        res_vec[i] = new CPUCryptoSystem::PlainText{combine_part_decryption_results(ct, pdrs_vec)};
+        res_vec[i] = new CPUCryptoSystem::PlainText{combine_partial_decryption_results(ct, pdrs_vec)};
     }
     return res_vec;
 }

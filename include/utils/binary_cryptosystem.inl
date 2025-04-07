@@ -11,19 +11,21 @@ inline int get_n_from_bits(Vector<int> bits) {
     return num;
 }
 
-CPUCryptoSystem::CipherText inline encrypt_bit(CPUCryptoSystem& cs,
-                                               CPUCryptoSystem::PublicKey& pk,
-                                               int bit) {
+template <typename CryptoSystem>
+typename CryptoSystem::CipherText inline encrypt_bit(
+    CryptoSystem& cs, const typename CryptoSystem::PublicKey& pk, int bit) {
     return cs.encrypt(pk, cs.make_plaintext(bit));
 }
 
-Vector<CPUCryptoSystem::CipherText> inline encrypt_bitwise(
-    CPUCryptoSystem& cs, CPUCryptoSystem::PublicKey& pk, unsigned int num) {
-    Vector<CPUCryptoSystem::CipherText> cts;
-    Tensor<CPUCryptoSystem::PlainText*> pt(NUM_BITS, nullptr);
+template <typename CryptoSystem>
+Vector<typename CryptoSystem::CipherText> inline encrypt_bitwise(
+    CryptoSystem& cs, const typename CryptoSystem::PublicKey& pk,
+    unsigned int num) {
+    Vector<typename CryptoSystem::CipherText> cts;
+    Tensor<typename CryptoSystem::PlainText*> pt(NUM_BITS, nullptr);
     CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (int i = 0; i < NUM_BITS; i++) {
-        pt.at(i) = new CPUCryptoSystem::PlainText(
-            cs.make_plaintext(get_nth_bit(num, i)));
+        pt.at(i) =
+            new CryptoSystem::PlainText(cs.make_plaintext(get_nth_bit(num, i)));
     }
     auto ct_tensor = cs.encrypt_tensor(pk, pt);
     for (int i = 0; i < NUM_BITS; i++) {
@@ -33,8 +35,9 @@ Vector<CPUCryptoSystem::CipherText> inline encrypt_bitwise(
     return cts;
 }
 
-inline unsigned int decrypt_bit(ClientNode<CPUCryptoSystem>& client_node,
-                                const CPUCryptoSystem::CipherText& ct) {
+template <typename CryptoSystem>
+inline unsigned int decrypt_bit(ClientNode<CryptoSystem>& client_node,
+                                const typename CryptoSystem::CipherText& ct) {
     auto serialized_ct = client_node.crypto_system().serialize_ciphertext(ct);
 
     ComputeRequest::ComputeOperationOperand decrypt_operand(
@@ -61,12 +64,13 @@ inline unsigned int decrypt_bit(ClientNode<CPUCryptoSystem>& client_node,
         client_node.crypto_system().get_float_from_plaintext(pt));
 }
 
+template <typename CryptoSystem>
 inline unsigned int
-decrypt_bitwise(ClientNode<CPUCryptoSystem>& client_node,
-                const Vector<CPUCryptoSystem::CipherText>& cts) {
-    Tensor<CPUCryptoSystem::CipherText*> ct(NUM_BITS, nullptr);
+decrypt_bitwise(ClientNode<CryptoSystem>& client_node,
+                const Vector<typename CryptoSystem::CipherText>& cts) {
+    Tensor<typename CryptoSystem::CipherText*> ct(NUM_BITS, nullptr);
     for (int i = 0; i < NUM_BITS; i++) {
-        ct.at(i) = new CPUCryptoSystem::CipherText(cts[i]);
+        ct.at(i) = new typename CryptoSystem::CipherText(cts[i]);
     }
 
     auto serialized_ct =
@@ -106,10 +110,11 @@ decrypt_bitwise(ClientNode<CPUCryptoSystem>& client_node,
     return num;
 }
 
-CPUCryptoSystem::CipherText inline homomorphic_and(
-    ClientNode<CPUCryptoSystem>& client_node,
-    const CPUCryptoSystem::CipherText& ct1,
-    const CPUCryptoSystem::CipherText& ct2) {
+template <typename CryptoSystem>
+typename CryptoSystem::CipherText inline homomorphic_and(
+    ClientNode<CryptoSystem>& client_node,
+    const typename CryptoSystem::CipherText& ct1,
+    const typename CryptoSystem::CipherText& ct2) {
     auto serialized_ct1 = client_node.crypto_system().serialize_ciphertext(ct1);
     auto serialized_ct2 = client_node.crypto_system().serialize_ciphertext(ct2);
 
@@ -140,15 +145,16 @@ CPUCryptoSystem::CipherText inline homomorphic_and(
     return res_ct;
 }
 
-Vector<CPUCryptoSystem::CipherText> inline homomorphic_and(
-    ClientNode<CPUCryptoSystem>& client_node,
-    const Vector<CPUCryptoSystem::CipherText>& ct1,
-    const Vector<CPUCryptoSystem::CipherText>& ct2) {
-    Tensor<CPUCryptoSystem::CipherText*> ct1_tensor(NUM_BITS, nullptr),
+template <typename CryptoSystem>
+Vector<typename CryptoSystem::CipherText> inline homomorphic_and(
+    ClientNode<CryptoSystem>& client_node,
+    const Vector<typename CryptoSystem::CipherText>& ct1,
+    const Vector<typename CryptoSystem::CipherText>& ct2) {
+    Tensor<typename CryptoSystem::CipherText*> ct1_tensor(NUM_BITS, nullptr),
         ct2_tensor(NUM_BITS, nullptr);
     CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (int i = 0; i < NUM_BITS; i++) {
-        ct1_tensor.at(i) = new CPUCryptoSystem::CipherText(ct1[i]);
-        ct2_tensor.at(i) = new CPUCryptoSystem::CipherText(ct2[i]);
+        ct1_tensor.at(i) = new typename CryptoSystem::CipherText(ct1[i]);
+        ct2_tensor.at(i) = new typename CryptoSystem::CipherText(ct2[i]);
     }
     auto serialized_ct1 =
         client_node.crypto_system().serialize_ciphertext_tensor(ct1_tensor);
@@ -179,7 +185,7 @@ Vector<CPUCryptoSystem::CipherText> inline homomorphic_and(
     auto res_ct =
         client_node.crypto_system().deserialize_ciphertext_tensor(res->data());
     delete res;
-    Vector<CPUCryptoSystem::CipherText> res_vec;
+    Vector<typename CryptoSystem::CipherText> res_vec;
     for (int i = 0; i < NUM_BITS; i++) {
         res_vec.push_back(*res_ct.at(i));
         delete ct1_tensor.at(i);
@@ -189,10 +195,11 @@ Vector<CPUCryptoSystem::CipherText> inline homomorphic_and(
     return res_vec;
 }
 
-CPUCryptoSystem::CipherText inline homomorphic_or(
-    ClientNode<CPUCryptoSystem>& client_node,
-    const CPUCryptoSystem::CipherText& ct1,
-    const CPUCryptoSystem::CipherText& ct2) {
+template <typename CryptoSystem>
+typename CryptoSystem::CipherText inline homomorphic_or(
+    ClientNode<CryptoSystem>& client_node,
+    const typename CryptoSystem::CipherText& ct1,
+    const typename CryptoSystem::CipherText& ct2) {
     auto add = client_node.crypto_system().add_ciphertexts(
         client_node.network_public_key(), ct1, ct2);
 
@@ -232,18 +239,19 @@ CPUCryptoSystem::CipherText inline homomorphic_or(
         client_node.network_public_key(), add, neg_mul);
 }
 
-Vector<CPUCryptoSystem::CipherText> inline homomorphic_or(
-    ClientNode<CPUCryptoSystem>& client_node,
-    const Vector<CPUCryptoSystem::CipherText>& ct1,
-    const Vector<CPUCryptoSystem::CipherText>& ct2) {
-    Tensor<CPUCryptoSystem::PlainText*> pt_neg_one(NUM_BITS, nullptr);
-    Tensor<CPUCryptoSystem::CipherText*> ct1_tensor(NUM_BITS, nullptr),
+template <typename CryptoSystem>
+Vector<typename CryptoSystem::CipherText> inline homomorphic_or(
+    ClientNode<CryptoSystem>& client_node,
+    const Vector<typename CryptoSystem::CipherText>& ct1,
+    const Vector<typename CryptoSystem::CipherText>& ct2) {
+    Tensor<typename CryptoSystem::PlainText*> pt_neg_one(NUM_BITS, nullptr);
+    Tensor<typename CryptoSystem::CipherText*> ct1_tensor(NUM_BITS, nullptr),
         ct2_tensor(NUM_BITS, nullptr);
     CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (int i = 0; i < NUM_BITS; i++) {
-        pt_neg_one.at(i) = new CPUCryptoSystem::PlainText(
+        pt_neg_one.at(i) = new CryptoSystem::PlainText(
             client_node.crypto_system().make_plaintext(-1));
-        ct1_tensor.at(i) = new CPUCryptoSystem::CipherText(ct1[i]);
-        ct2_tensor.at(i) = new CPUCryptoSystem::CipherText(ct2[i]);
+        ct1_tensor.at(i) = new typename CryptoSystem::CipherText(ct1[i]);
+        ct2_tensor.at(i) = new typename CryptoSystem::CipherText(ct2[i]);
     }
     auto add = client_node.crypto_system().add_ciphertext_tensors(
         client_node.network_public_key(), ct1_tensor, ct2_tensor);
@@ -283,7 +291,7 @@ Vector<CPUCryptoSystem::CipherText> inline homomorphic_or(
     auto or_res = client_node.crypto_system().add_ciphertext_tensors(
         client_node.network_public_key(), add, neg_mul);
 
-    Vector<CPUCryptoSystem::CipherText> res_vec;
+    Vector<typename CryptoSystem::CipherText> res_vec;
     for (int i = 0; i < NUM_BITS; i++) {
         res_vec.push_back(*or_res.at(i));
         delete pt_neg_one.at(i);
@@ -298,9 +306,10 @@ Vector<CPUCryptoSystem::CipherText> inline homomorphic_or(
     return res_vec;
 }
 
-CPUCryptoSystem::CipherText inline homomorphic_not(
-    ClientNode<CPUCryptoSystem>& client_node,
-    const CPUCryptoSystem::CipherText& ct) {
+template <typename CryptoSystem>
+typename CryptoSystem::CipherText inline homomorphic_not(
+    ClientNode<CryptoSystem>& client_node,
+    const typename CryptoSystem::CipherText& ct) {
     auto enc_one = client_node.crypto_system().encrypt(
         client_node.network_public_key(),
         client_node.crypto_system().make_plaintext(1));
@@ -311,19 +320,20 @@ CPUCryptoSystem::CipherText inline homomorphic_not(
         client_node.network_public_key(), enc_one, neg_ct);
 }
 
-Vector<CPUCryptoSystem::CipherText> inline homomorphic_not(
-    ClientNode<CPUCryptoSystem>& client_node,
-    const Vector<CPUCryptoSystem::CipherText>& ct) {
-    Vector<CPUCryptoSystem::CipherText> res;
-    Tensor<CPUCryptoSystem::PlainText*> pt_one(NUM_BITS, nullptr),
+template <typename CryptoSystem>
+Vector<typename CryptoSystem::CipherText> inline homomorphic_not(
+    ClientNode<CryptoSystem>& client_node,
+    const Vector<typename CryptoSystem::CipherText>& ct) {
+    Vector<typename CryptoSystem::CipherText> res;
+    Tensor<typename CryptoSystem::PlainText*> pt_one(NUM_BITS, nullptr),
         pt_neg_one(NUM_BITS, nullptr);
-    Tensor<CPUCryptoSystem::CipherText*> ct_tensor(NUM_BITS, nullptr);
+    Tensor<typename CryptoSystem::CipherText*> ct_tensor(NUM_BITS, nullptr);
     CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (int i = 0; i < NUM_BITS; i++) {
-        pt_one.at(i) = new CPUCryptoSystem::PlainText(
+        pt_one.at(i) = new CryptoSystem::PlainText(
             client_node.crypto_system().make_plaintext(1));
-        pt_neg_one.at(i) = new CPUCryptoSystem::PlainText(
+        pt_neg_one.at(i) = new CryptoSystem::PlainText(
             client_node.crypto_system().make_plaintext(-1));
-        ct_tensor.at(i) = new CPUCryptoSystem::CipherText(ct[i]);
+        ct_tensor.at(i) = new typename CryptoSystem::CipherText(ct[i]);
     }
     auto enc_one = client_node.crypto_system().encrypt_tensor(
         client_node.network_public_key(), pt_one);
@@ -343,10 +353,11 @@ Vector<CPUCryptoSystem::CipherText> inline homomorphic_not(
     return res;
 }
 
-CPUCryptoSystem::CipherText inline homomorphic_xor(
-    ClientNode<CPUCryptoSystem>& client_node,
-    const CPUCryptoSystem::CipherText& ct1,
-    const CPUCryptoSystem::CipherText& ct2) {
+template <typename CryptoSystem>
+typename CryptoSystem::CipherText inline homomorphic_xor(
+    ClientNode<CryptoSystem>& client_node,
+    const typename CryptoSystem::CipherText& ct1,
+    const typename CryptoSystem::CipherText& ct2) {
     auto add = client_node.crypto_system().add_ciphertexts(
         client_node.network_public_key(), ct1, ct2);
 
@@ -385,18 +396,19 @@ CPUCryptoSystem::CipherText inline homomorphic_xor(
         client_node.network_public_key(), add, neg_mul);
 }
 
-Vector<CPUCryptoSystem::CipherText> inline homomorphic_xor(
-    ClientNode<CPUCryptoSystem>& client_node,
-    const Vector<CPUCryptoSystem::CipherText>& ct1,
-    const Vector<CPUCryptoSystem::CipherText>& ct2) {
-    Tensor<CPUCryptoSystem::PlainText*> pt_neg_two(NUM_BITS, nullptr);
-    Tensor<CPUCryptoSystem::CipherText*> ct1_tensor(NUM_BITS, nullptr),
+template <typename CryptoSystem>
+Vector<typename CryptoSystem::CipherText> inline homomorphic_xor(
+    ClientNode<CryptoSystem>& client_node,
+    const Vector<typename CryptoSystem::CipherText>& ct1,
+    const Vector<typename CryptoSystem::CipherText>& ct2) {
+    Tensor<typename CryptoSystem::PlainText*> pt_neg_two(NUM_BITS, nullptr);
+    Tensor<typename CryptoSystem::CipherText*> ct1_tensor(NUM_BITS, nullptr),
         ct2_tensor(NUM_BITS, nullptr);
     CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (int i = 0; i < NUM_BITS; i++) {
-        pt_neg_two.at(i) = new CPUCryptoSystem::PlainText(
+        pt_neg_two.at(i) = new CryptoSystem::PlainText(
             client_node.crypto_system().make_plaintext(-2));
-        ct1_tensor.at(i) = new CPUCryptoSystem::CipherText(ct1[i]);
-        ct2_tensor.at(i) = new CPUCryptoSystem::CipherText(ct2[i]);
+        ct1_tensor.at(i) = new typename CryptoSystem::CipherText(ct1[i]);
+        ct2_tensor.at(i) = new typename CryptoSystem::CipherText(ct2[i]);
     }
     auto add = client_node.crypto_system().add_ciphertext_tensors(
         client_node.network_public_key(), ct1_tensor, ct2_tensor);
@@ -436,7 +448,7 @@ Vector<CPUCryptoSystem::CipherText> inline homomorphic_xor(
     auto xor_res = client_node.crypto_system().add_ciphertext_tensors(
         client_node.network_public_key(), add, neg_mul);
 
-    Vector<CPUCryptoSystem::CipherText> res_vec;
+    Vector<typename CryptoSystem::CipherText> res_vec;
     for (int i = 0; i < NUM_BITS; i++) {
         res_vec.push_back(*xor_res.at(i));
         delete pt_neg_two.at(i);
@@ -451,11 +463,12 @@ Vector<CPUCryptoSystem::CipherText> inline homomorphic_xor(
     return res_vec;
 }
 
-Vector<CPUCryptoSystem::CipherText> inline homomorphic_add(
-    ClientNode<CPUCryptoSystem>& client_node,
-    const Vector<CPUCryptoSystem::CipherText>& ct1,
-    const Vector<CPUCryptoSystem::CipherText>& ct2) {
-    Vector<CPUCryptoSystem::CipherText> res;
+template <typename CryptoSystem>
+Vector<typename CryptoSystem::CipherText> inline homomorphic_add(
+    ClientNode<CryptoSystem>& client_node,
+    const Vector<typename CryptoSystem::CipherText>& ct1,
+    const Vector<typename CryptoSystem::CipherText>& ct2) {
+    Vector<typename CryptoSystem::CipherText> res;
     auto carry = homomorphic_and(client_node, ct1[0], ct2[0]);
     res.push_back(homomorphic_xor(client_node, ct1[0], ct2[0]));
     for (int i = 1; i < NUM_BITS; i++) {
@@ -478,22 +491,24 @@ Vector<CPUCryptoSystem::CipherText> inline homomorphic_add(
     return res;
 }
 
-Vector<CPUCryptoSystem::CipherText> inline homomorphic_2s_complement(
-    ClientNode<CPUCryptoSystem>& client_node,
-    const Vector<CPUCryptoSystem::CipherText>& ct) {
+template <typename CryptoSystem>
+Vector<typename CryptoSystem::CipherText> inline homomorphic_2s_complement(
+    ClientNode<CryptoSystem>& client_node,
+    const Vector<typename CryptoSystem::CipherText>& ct) {
     auto enc_one_bitwise = encrypt_bitwise(client_node.crypto_system(),
                                            client_node.network_public_key(), 1);
     auto ones_complement = homomorphic_not(client_node, ct);
     return homomorphic_add(client_node, enc_one_bitwise, ones_complement);
 }
 
-Vector<CPUCryptoSystem::CipherText> inline homomorphic_sub(
-    ClientNode<CPUCryptoSystem>& client_node,
-    const Vector<CPUCryptoSystem::CipherText>& ct1,
-    const Vector<CPUCryptoSystem::CipherText>& ct2) {
+template <typename CryptoSystem>
+Vector<typename CryptoSystem::CipherText> inline homomorphic_sub(
+    ClientNode<CryptoSystem>& client_node,
+    const Vector<typename CryptoSystem::CipherText>& ct1,
+    const Vector<typename CryptoSystem::CipherText>& ct2) {
     // return homomorphic_add(client_node, ct1,
     // homomorphic_2s_complement(client_node, ct2));
-    Vector<CPUCryptoSystem::CipherText> res;
+    Vector<typename CryptoSystem::CipherText> res;
     auto neg_ct1 = homomorphic_not(client_node, ct1);
     auto borrow = homomorphic_and(client_node, ct2[0], neg_ct1[0]);
     res.push_back(homomorphic_xor(client_node, ct1[0], ct2[0]));
@@ -509,10 +524,11 @@ Vector<CPUCryptoSystem::CipherText> inline homomorphic_sub(
     return res;
 }
 
-CPUCryptoSystem::CipherText inline homomorphic_lt(
-    ClientNode<CPUCryptoSystem>& client_node,
-    Vector<CPUCryptoSystem::CipherText>& ct1,
-    Vector<CPUCryptoSystem::CipherText>& ct2) {
+template <typename CryptoSystem>
+typename CryptoSystem::CipherText inline homomorphic_lt(
+    ClientNode<CryptoSystem>& client_node,
+    Vector<typename CryptoSystem::CipherText>& ct1,
+    Vector<typename CryptoSystem::CipherText>& ct2) {
     auto neg_ct1 = homomorphic_not(client_node, ct1);
     auto borrow = homomorphic_and(client_node, ct2[0], neg_ct1[0]);
     for (int i = 1; i < NUM_BITS; i++) {
@@ -526,57 +542,79 @@ CPUCryptoSystem::CipherText inline homomorphic_lt(
     return borrow;
 }
 
-CPUCryptoSystem::CipherText inline homomorphic_eq(
-    ClientNode<CPUCryptoSystem>& client_node,
-    Vector<CPUCryptoSystem::CipherText>& ct1,
-    Vector<CPUCryptoSystem::CipherText>& ct2) {
+template <typename CryptoSystem>
+typename CryptoSystem::CipherText inline homomorphic_eq(
+    ClientNode<CryptoSystem>& client_node,
+    Vector<typename CryptoSystem::CipherText>& ct1,
+    Vector<typename CryptoSystem::CipherText>& ct2) {
     auto sub = homomorphic_sub(client_node, ct1, ct2);
-    CPUCryptoSystem::CipherText sub_bits_sum = sub[0];
+    typename CryptoSystem::CipherText sub_bits_sum = sub[0];
     for (int i = 1; i < NUM_BITS; i++) {
         sub_bits_sum = homomorphic_or(client_node, sub_bits_sum, sub[i]);
     }
     return homomorphic_not(client_node, sub_bits_sum);
 }
 
-CPUCryptoSystem::CipherText inline homomorphic_gt(
-    ClientNode<CPUCryptoSystem>& client_node,
-    Vector<CPUCryptoSystem::CipherText>& ct1,
-    Vector<CPUCryptoSystem::CipherText>& ct2) {
+template <typename CryptoSystem>
+typename CryptoSystem::CipherText inline homomorphic_gt(
+    ClientNode<CryptoSystem>& client_node,
+    Vector<typename CryptoSystem::CipherText>& ct1,
+    Vector<typename CryptoSystem::CipherText>& ct2) {
     return homomorphic_lt(client_node, ct2, ct1);
 }
 
-std::string inline serialize_bit(const CPUCryptoSystem& cs,
-                                 const CPUCryptoSystem::CipherText& ct) {
+template <typename CryptoSystem>
+std::string inline serialize_bit(const CryptoSystem& cs,
+                                 const typename CryptoSystem::CipherText& ct) {
     return cs.serialize_ciphertext(ct);
 }
 
-CPUCryptoSystem::CipherText inline deserialize_bit(
-    const CPUCryptoSystem& cs, const std::string& serialized) {
+template <typename CryptoSystem>
+typename CryptoSystem::CipherText inline deserialize_bit(
+    const CryptoSystem& cs, const std::string& serialized) {
     return cs.deserialize_ciphertext(serialized);
 }
 
+template <typename CryptoSystem>
 std::string inline serialize_bitwise(
-    const CPUCryptoSystem& cs, const Vector<CPUCryptoSystem::CipherText>& cts) {
-    std::string serialized;
-    for (int i = 0; i < cts.size(); i++) {
-        serialized += cs.serialize_ciphertext(cts[i]);
-        if (i != cts.size() - 1) {
-            serialized += " ";
-        }
+    const CryptoSystem& cs,
+    const Vector<typename CryptoSystem::CipherText>& cts) {
+    //  NUM_BITS*8 bytes are used to represent the size of each ciphertext
+    // the size of each ciphertext is stored before the ciphertext
+    // the rest of the bytes are the ciphertexts
+    // this and deserialization funcs can be further optimized if needed
+    std::vector<std::string> serialized_cts;
+    for (int i = 0; i < NUM_BITS; i++) {
+        serialized_cts.push_back(cs.serialize_ciphertext(cts[i]));
+    }
+    uint64_t total_size = NUM_BITS * sizeof(uint64_t);
+    for (int i = 0; i < NUM_BITS; i++) {
+        total_size += serialized_cts[i].size();
+    }
+    std::string serialized(total_size, 0);
+    char* data_ptr = serialized.data();
+    for (int i = 0; i < NUM_BITS; i++) {
+        uint64_t size_of_ct = serialized_cts[i].size();
+        memcpy(data_ptr, &size_of_ct, sizeof(uint64_t));
+        data_ptr += sizeof(uint64_t);
+        memcpy(data_ptr, serialized_cts[i].data(), size_of_ct);
+        data_ptr += size_of_ct;
     }
     return serialized;
 }
 
-Vector<CPUCryptoSystem::CipherText> inline deserialize_bitwise(
-    const CPUCryptoSystem& cs, const std::string& serialized) {
-    Vector<CPUCryptoSystem::CipherText> cts;
-    std::istringstream iss(serialized);
-    std::string c1_a_str, c1_b_str, c1_c_str, c2_a_str, c2_b_str, c2_c_str;
-    while (iss >> c1_a_str >> c1_b_str >> c1_c_str >> c2_a_str >> c2_b_str >>
-           c2_c_str) {
-        std::string t_str = c1_a_str + " " + c1_b_str + " " + c1_c_str + " " +
-                            c2_a_str + " " + c2_b_str + " " + c2_c_str;
-        cts.push_back(cs.deserialize_ciphertext(t_str));
+template <typename CryptoSystem>
+Vector<typename CryptoSystem::CipherText> inline deserialize_bitwise(
+    const CryptoSystem& cs, const std::string& serialized) {
+    Vector<typename CryptoSystem::CipherText> cts;
+    const char* data_ptr = serialized.data();
+    for (int i = 0; i < NUM_BITS; i++) {
+        uint64_t size_of_ct;
+        memcpy(&size_of_ct, data_ptr, sizeof(uint64_t));
+        data_ptr += sizeof(uint64_t);
+        std::string ct_str(data_ptr, size_of_ct);
+        cts.push_back(cs.deserialize_ciphertext(ct_str));
+        data_ptr += size_of_ct;
     }
     return cts;
 }

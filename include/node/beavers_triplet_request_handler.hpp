@@ -88,12 +88,12 @@ namespace CoFHE
         using ResponseType = BeaversTripletResponse;
 
         BeaversTripletRequestHandler(const CryptoSystem &crypto_system, const CryptoSystem::PublicKey &public_key) :
-        crypto_system_m(crypto_system), public_key_m(public_key), generator_m(crypto_system, public_key) {}
+        cryptosystem_m(crypto_system), public_key_m(public_key), generator_m(crypto_system, public_key) {}
 
         BeaversTripletResponse handle_request(const BeaversTripletRequest &req)
         {
             auto triplets = generator_m.generate(req.num_triples());
-            auto data = crypto_system_m.serialize_ciphertext_tensor(triplets);
+            auto data = cryptosystem_m.serialize_ciphertext_tensor(triplets);
             CoFHE_PARALLEL_FOR_STATIC_SCHEDULE
             for (size_t i = 0; i < triplets.size(); i++)
             {
@@ -104,7 +104,7 @@ namespace CoFHE
             return BeaversTripletResponse(BeaversTripletResponse::Status::OK, data);
         }
     private:
-        CryptoSystem crypto_system_m;
+        CryptoSystem cryptosystem_m;
         CryptoSystem::PublicKey public_key_m;
         BeaversTripletGenerator<CryptoSystem> generator_m;
     };
