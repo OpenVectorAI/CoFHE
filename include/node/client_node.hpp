@@ -43,6 +43,10 @@ template <typename CryptoSystem> class ClientNode {
     }
     ReencryptorType& reencryptor() { return reencryptor_m; }
     const ReencryptorType& reencryptor() const { return reencryptor_m; }
+    NetworkDetails& network_details() { return network_details_m; }
+    const NetworkDetails& network_details() const {
+        return network_details_m;
+    }
 
   private:
     NetworkDetails network_details_m;
@@ -82,7 +86,7 @@ auto make_client_node(const NodeDetails& setup_node,
     NetworkDetails network_details = NetworkDetails::from_string(
         NetworkDetailsResponse::from_string(res->data()).data());
     delete res;
-    return ClientNode<CryptoSystem>(network_details);
+    return ClientNode<CryptoSystem>(network_details, cert_path);
 }
 } // namespace CoFHE
 
