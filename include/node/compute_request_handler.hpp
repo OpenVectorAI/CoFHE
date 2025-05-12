@@ -22,7 +22,8 @@ class ComputeRequestHandler {
     using PlainText = typename CryptoSystem::PlainText;
     ComputeRequestHandler(const NetworkDetails& nd)
         : nd_m(nd), cryptosystem_m(nd_m.cryptosystem_details().security_level,
-                                   nd_m.cryptosystem_details().k),
+                                   nd_m.cryptosystem_details().k,
+                                   nd_m.cryptosystem_details().N),
           public_key_m(cryptosystem_m.deserialize_public_key(
               nd_m.cryptosystem_details().public_key)),
           smpc_client_m(nd_m), ciphertext_multiplier_m(smpc_client_m),
@@ -1995,11 +1996,21 @@ class ComputeRequestHandler {
 
         switch (operation.operands()[0].data_type()) {
         case ComputeRequest::DataType::SINGLE: {
-            return ComputeResponse(
+            std::cout << "Reencrypting single" << std::endl;
+            std::cout << operation.operands()[0].data() << std::endl;
+            std::cout << operation.operands()[1].data() << std::endl;
+            auto ct = cryptosystem_m.deserialize_ciphertext(
+                operation.operands()[0].data());
+            std::cout << ct.c1() << std::endl;
+            std::cout << ct.c2() << std::endl;
+            auto res = ComputeResponse(
                 ComputeResponse::Status::OK,
                 smpc_client_m.reencrypt(cryptosystem_m.deserialize_ciphertext(
                                             operation.operands()[0].data()),
                                         operation.operands()[1].data()));
+            std::cout << res.data() << std::endl;
+            std::cout << "Reencrypted single" << std::endl;
+            return res;
         }
         case ComputeRequest::DataType::TENSOR: {
             auto ct = cryptosystem_m.deserialize_ciphertext_tensor(

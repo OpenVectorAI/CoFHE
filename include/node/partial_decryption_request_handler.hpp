@@ -241,13 +241,17 @@ class PartialDecryptionRequestHandler {
 
     PartialDecryptionResponse handle_single_value_with_reencryption(
         const PartialDecryptionRequest& request) const {
+        auto pd = cryptosystem_m.part_decrypt(
+            secret_key_shares_m[request.sk_share_id()],
+            cryptosystem_m.deserialize_ciphertext(request.data()));
+        std::ostringstream oss;
+        oss << pd << "\n";
+        oss << cryptosystem_m.serialize_partial_decryption_result(pd);
+        auto str_ss = oss.str();
+        std::cout << "Partial decryption result: " << str_ss << std::endl;
         return PartialDecryptionResponse(
             PartialDecryptionResponse::Status::OK,
-            reencryptor_m.reencrypt(
-                cryptosystem_m.part_decrypt(
-                    secret_key_shares_m[request.sk_share_id()],
-                    cryptosystem_m.deserialize_ciphertext(request.data())),
-                request.serialized_public_key()));
+            reencryptor_m.reencrypt(pd, request.serialized_public_key()));
     }
 
     PartialDecryptionResponse handle_tensor_with_reencryption(

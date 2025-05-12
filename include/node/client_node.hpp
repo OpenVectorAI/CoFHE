@@ -19,7 +19,8 @@ template <typename CryptoSystem> class ClientNode {
         : network_details_m(network_details),
           cryptosystem_m(CryptoSystem(
               network_details.cryptosystem_details().security_level,
-              network_details.cryptosystem_details().k)),
+              network_details.cryptosystem_details().k,
+              network_details.cryptosystem_details().N)),
           network_public_key_m(cryptosystem_m.deserialize_public_key(
               network_details.cryptosystem_details().public_key)),
           cert_path_m(cert_path),
@@ -44,9 +45,7 @@ template <typename CryptoSystem> class ClientNode {
     ReencryptorType& reencryptor() { return reencryptor_m; }
     const ReencryptorType& reencryptor() const { return reencryptor_m; }
     NetworkDetails& network_details() { return network_details_m; }
-    const NetworkDetails& network_details() const {
-        return network_details_m;
-    }
+    const NetworkDetails& network_details() const { return network_details_m; }
 
   private:
     NetworkDetails network_details_m;

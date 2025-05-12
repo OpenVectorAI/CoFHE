@@ -170,14 +170,10 @@ template <typename CryptoSystem> class SetupNodeRequestHandler {
                             const ReencryptorDetails& reencryptor_details)
         : join_as_node_handler_m(cryptosystem_details, self_details,
                                  reencryptor_details),
-          beavers_triplet_handler_m(
-              CryptoSystem(cryptosystem_details.security_level,
-                           cryptosystem_details.k),
-              join_as_node_handler_m.public_key()),
-          comparision_pair_handler_m(
-              CryptoSystem(cryptosystem_details.security_level,
-                           cryptosystem_details.k),
-              join_as_node_handler_m.public_key()) {}
+          beavers_triplet_handler_m(join_as_node_handler_m.cryptosystem(),
+                                    join_as_node_handler_m.public_key()),
+          comparision_pair_handler_m(join_as_node_handler_m.cryptosystem(),
+                                     join_as_node_handler_m.public_key()) {}
 
     SetupNodeResponse handle_request(const SetupNodeRequest& req) {
         switch (req.type()) {

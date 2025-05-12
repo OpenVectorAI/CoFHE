@@ -15,8 +15,8 @@
 #include "node/setup_node_request_handler.hpp"
 #include "smpc/reencryption.hpp"
 
-#define BEAVERS_TRIPLET_CACHE_SIZE 1000000
-#define COMPARISION_PAIR_CACHE_SIZE 250000
+#define BEAVERS_TRIPLET_CACHE_SIZE 10000 // 1000000
+#define COMPARISION_PAIR_CACHE_SIZE 2500 // 250000
 
 namespace CoFHE {
 template <typename CryptoSystem, typename PKCEncryptor> class SMPCClient {
@@ -30,7 +30,8 @@ template <typename CryptoSystem, typename PKCEncryptor> class SMPCClient {
         : network_details_m(nd),
           crypto_system_m(CryptoSystem(
               network_details_m.cryptosystem_details().security_level,
-              network_details_m.cryptosystem_details().k)),
+              network_details_m.cryptosystem_details().k,
+              network_details_m.cryptosystem_details().N)),
           public_key_m(crypto_system_m.deserialize_public_key(
               network_details_m.cryptosystem_details().public_key)) {
         init();

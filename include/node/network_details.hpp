@@ -109,6 +109,7 @@ struct CryptoSystemDetails {
     size_t k;
     size_t threshold;
     size_t total_nodes;
+    std::string N;
 };
 
 class NetworkDetails {
@@ -175,6 +176,8 @@ class NetworkDetails {
             cryptosystem_details_m.threshold;
         j["cryptosystem_details"]["total_nodes"] =
             cryptosystem_details_m.total_nodes;
+        j["cryptosystem_details"]["N"] = cryptosystem_details_m.N;
+        j["secret_key_shares"] = nlohmann::json::array();
         for (const auto& share : secret_key_shares_m) {
             j["secret_key_shares"].push_back(base64_encode(share));
         }
@@ -213,6 +216,7 @@ class NetworkDetails {
         cryptosystem_details.threshold = j["cryptosystem_details"]["threshold"];
         cryptosystem_details.total_nodes =
             j["cryptosystem_details"]["total_nodes"];
+        cryptosystem_details.N = j["cryptosystem_details"]["N"];
         std::vector<std::string> secret_key_shares;
         for (const auto& share : j["secret_key_shares"]) {
             secret_key_shares.push_back(base64_decode(share));

@@ -337,6 +337,12 @@ template <typename CryptoSystem> class JoinAsNodeRequestHandler {
         std::lock_guard<std::mutex> lock(mtx_m);
         return *public_key_p_m;
     }
+    CryptoSystem & cryptosystem() {
+        return cryptosystem_m;
+    }
+    const CryptoSystem & cryptosystem() const {
+        return cryptosystem_m;
+    }
 
   private:
     CryptoSystemDetails cryptosystem_details_m;
@@ -361,6 +367,7 @@ template <typename CryptoSystem> class JoinAsNodeRequestHandler {
             new typename CryptoSystem::PublicKey(cryptosystem_m.keygen(sk));
         public_key_m = cryptosystem_m.serialize_public_key(*public_key_p_m);
         network_details_m.cryptosystem_details().public_key = public_key_m;
+        network_details_m.cryptosystem_details().N = cryptosystem_m.N();
         auto sk_shares = cryptosystem_m.keygen(sk, threshold_m, total_nodes_m);
         for (const auto& party : sk_shares) {
             std::vector<std::string> secret_key_shares_m_party;

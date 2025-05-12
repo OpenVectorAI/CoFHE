@@ -31,9 +31,7 @@ class RSAPKCEncryptor {
     RSAPKCEncryptor(uint32_t key_size) : key_size_m(key_size) {
         init_openssl();
     }
-    ~RSAPKCEncryptor() {
-        cleanup_openssl();
-    }
+    ~RSAPKCEncryptor() { cleanup_openssl(); }
 
     KeyPair generate_key_pair() const {
         unique_pkey_ctx_ptr keygen_ctx(
@@ -161,9 +159,17 @@ class RSAPKCEncryptor {
             handle_openssl_errors("EVP_PKEY_encrypt_init failed");
         }
 
-        if (EVP_PKEY_CTX_set_rsa_padding(enc_ctx.get(), RSA_PKCS1_PADDING) <=
-            0) {
-            handle_openssl_errors("EVP_PKEY_CTX_set_rsa_padding failed");
+        if (EVP_PKEY_CTX_set_rsa_padding(enc_ctx.get(),
+                                         RSA_PKCS1_OAEP_PADDING) <= 0) {
+            handle_openssl_errors("EVP_PKEY_CTX_set_rsa_padding (OAEP) failed");
+        }
+
+        if (EVP_PKEY_CTX_set_rsa_oaep_md(enc_ctx.get(), EVP_sha256()) <= 0) {
+            handle_openssl_errors("EVP_PKEY_CTX_set_rsa_oaep_md failed");
+        }
+
+        if (EVP_PKEY_CTX_set_rsa_mgf1_md(enc_ctx.get(), EVP_sha256()) <= 0) {
+            handle_openssl_errors("EVP_PKEY_CTX_set_rsa_mgf1_md failed");
         }
 
         size_t encrypted_len_out = 0;
@@ -201,11 +207,18 @@ class RSAPKCEncryptor {
             handle_openssl_errors("EVP_PKEY_decrypt_init failed");
         }
 
-        if (EVP_PKEY_CTX_set_rsa_padding(dec_ctx.get(), RSA_PKCS1_PADDING) <=
-            0) {
-            handle_openssl_errors("EVP_PKEY_CTX_set_rsa_padding failed");
+        if (EVP_PKEY_CTX_set_rsa_padding(dec_ctx.get(),
+                                         RSA_PKCS1_OAEP_PADDING) <= 0) {
+            handle_openssl_errors("EVP_PKEY_CTX_set_rsa_padding (OAEP) failed");
         }
 
+        if (EVP_PKEY_CTX_set_rsa_oaep_md(dec_ctx.get(), EVP_sha256()) <= 0) {
+            handle_openssl_errors("EVP_PKEY_CTX_set_rsa_oaep_md failed");
+        }
+
+        if (EVP_PKEY_CTX_set_rsa_mgf1_md(dec_ctx.get(), EVP_sha256()) <= 0) {
+            handle_openssl_errors("EVP_PKEY_CTX_set_rsa_mgf1_md failed");
+        }
         size_t decrypted_len_out = 0;
         if (EVP_PKEY_decrypt(
                 dec_ctx.get(), nullptr, &decrypted_len_out,

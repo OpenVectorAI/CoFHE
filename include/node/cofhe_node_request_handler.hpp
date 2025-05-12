@@ -161,7 +161,8 @@ class CoFHENodeRequestHandler {
     using SecretKeyShare = typename CryptoSystem::SecretKeyShare;
     CoFHENodeRequestHandler(const NetworkDetails& nd)
         : nd_m(nd), cryptosystem_m(nd.cryptosystem_details().security_level,
-                                   nd.cryptosystem_details().k),
+                                   nd.cryptosystem_details().k,
+                                   nd.cryptosystem_details().N),
           pk_m(cryptosystem_m.deserialize_public_key(
               nd.cryptosystem_details().public_key)),
           sk_shares_m(),

@@ -1,6 +1,6 @@
 # CoFHE
 
-**Collaborative Fully Homomorphic Encryption (CoFHE)** is a homomorphic encryption scheme designed to perform any number of secure computations without needing any bootstrapping operations. In CoFHE most of the computation is done by a single node called compute node. Rest of the threshold number of nodes does only 5% of the computations, in order to support fully homomorphic operations at compute node.
+**CoFHE** is a homomorphic encryption scheme designed to perform any number of secure computations without needing any bootstrapping operations. In CoFHE most of the computation is done by a single node called compute node. Rest of the threshold number of nodes does only 5% of the computations, in order to support fully homomorphic operations at compute node.
 
 ## Documentation
 
