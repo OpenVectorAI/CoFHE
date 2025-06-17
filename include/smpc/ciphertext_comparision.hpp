@@ -5,13 +5,13 @@
 #include "smpc/smpc_client.hpp"
 
 namespace CoFHE {
-template <typename CryptoSystem, typename PKCEncryptor>
+template <typename CryptoSystem, typename PKCEncryptor,typename SHECryptoSystem>
 class SMPCCipherTextComparator {
   public:
     using CipherText = typename CryptoSystem::CipherText;
     using PublicKey = typename CryptoSystem::PublicKey;
     SMPCCipherTextComparator(
-        SMPCClient<CryptoSystem, PKCEncryptor>& smpc_client)
+        SMPCClient<CryptoSystem, PKCEncryptor,SHECryptoSystem>& smpc_client)
         : cryptosystem_m(smpc_client.crypto_system()),
           public_key_m(smpc_client.network_public_key()),
           smpc_client_m(smpc_client), ciphertext_multiplier_m(smpc_client) {}
@@ -140,8 +140,8 @@ class SMPCCipherTextComparator {
   private:
     CryptoSystem cryptosystem_m;
     PublicKey public_key_m;
-    SMPCClient<CryptoSystem, PKCEncryptor>& smpc_client_m;
-    SMPCCipherTextMultiplier<CryptoSystem, PKCEncryptor>
+    SMPCClient<CryptoSystem, PKCEncryptor,SHECryptoSystem>& smpc_client_m;
+    SMPCCipherTextMultiplier<CryptoSystem, PKCEncryptor,SHECryptoSystem>
         ciphertext_multiplier_m;
 
     void free_random_pair(Tensor<CipherText*>& random_pair) {

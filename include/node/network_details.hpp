@@ -11,8 +11,6 @@
 #include "common/algorithms.hpp"
 #include "common/base64.hpp"
 
-#include "cofhe.hpp"
-
 namespace CoFHE {
 enum class NodeType { SETUP_NODE, CoFHE_NODE, COMPUTE_NODE, CLIENT_NODE };
 
@@ -250,6 +248,180 @@ class NetworkDetails {
     ReencryptorDetails reencryption_details_m;
 };
 
+class BeaversTripletGenerationDetails {
+  public:
+    BeaversTripletGenerationDetails(const std::string& randomness_lower_bound,
+                                    const std::string& randomness_upper_bound,
+                                    const std::string& ab_pair_lower_bound,
+                                    const std::string& ab_pair_upper_bound,
+                                    const std::string& plaintext_modulus,
+                                    const std::string& multiplicative_depth,
+                                    size_t threshold, size_t total_nodes,
+                                    size_t security_level)
+        : randomness_lower_bound_m(randomness_lower_bound),
+          randomness_upper_bound_m(randomness_upper_bound),
+          ab_pair_lower_bound_m(ab_pair_lower_bound),
+          ab_pair_upper_bound_m(ab_pair_upper_bound),
+          plaintext_modulus_m(plaintext_modulus),
+          multiplicative_depth_m(multiplicative_depth), threshold_m(threshold),
+          total_nodes_m(total_nodes), security_level_m(security_level) {}
+
+    const std::string& randomness_lower_bound() const {
+        return randomness_lower_bound_m;
+    }
+    const std::string& randomness_upper_bound() const {
+        return randomness_upper_bound_m;
+    }
+    const std::string& ab_pair_lower_bound() const {
+        return ab_pair_lower_bound_m;
+    }
+    const std::string& ab_pair_upper_bound() const {
+        return ab_pair_upper_bound_m;
+    }
+    const std::string& serialized_she_sk_share() const {
+        return serialized_she_sk_share_m;
+    }
+    const std::string& plaintext_modulus() const { return plaintext_modulus_m; }
+    const std::string& multiplicative_depth() const {
+        return multiplicative_depth_m;
+    }
+    size_t threshold() const { return threshold_m; }
+    size_t total_nodes() const { return total_nodes_m; }
+    size_t security_level() const { return security_level_m; }
+    const std::string& crypto_context() const { return crypto_context_m; }
+    const std::string& serialized_she_public_key() const {
+        return serialized_she_public_key_m;
+    }
+
+    void set_crypto_context(const std::string& crypto_context) {
+        crypto_context_m = crypto_context;
+    }
+    void set_serialized_she_public_key(
+        const std::string& serialized_she_public_key) {
+        serialized_she_public_key_m = serialized_she_public_key;
+    }
+    void
+    set_serialized_she_sk_share(const std::string& serialized_she_sk_share) {
+        serialized_she_sk_share_m = serialized_she_sk_share;
+    }
+
+    std::string to_string() const {
+        // first 16 bytes represent start of serialized_she_public_key_m and
+        // serialized_she_sk_share_m
+        std::string binary_data =
+            std::string(2 * 8 + crypto_context_m.size() +
+                            serialized_she_public_key_m.size() +
+                            serialized_she_sk_share_m.size(),
+                        '\0');
+        char* data_ptr = binary_data.data();
+        uint64_t offset = 16 + crypto_context_m.size();
+        std::memcpy(data_ptr, &offset, 8);
+        offset += serialized_she_public_key_m.size();
+        std::memcpy(data_ptr + 8, &offset, 8);
+        std::memcpy(data_ptr + 16, crypto_context_m.data(),
+                    crypto_context_m.size());
+        std::memcpy(data_ptr + 16 + crypto_context_m.size(),
+                    serialized_she_public_key_m.data(),
+                    serialized_she_public_key_m.size());
+        std::memcpy(data_ptr + 16 + crypto_context_m.size() +
+                        serialized_she_public_key_m.size(),
+                    serialized_she_sk_share_m.data(),
+                    serialized_she_sk_share_m.size());
+        return randomness_lower_bound_m + "\n" + randomness_upper_bound_m +
+               "\n" + ab_pair_lower_bound_m + "\n" + ab_pair_upper_bound_m +
+               "\n" + plaintext_modulus_m + "\n" + multiplicative_depth_m +
+               "\n" + std::to_string(threshold_m) + "\n" +
+               std::to_string(total_nodes_m) + "\n" +
+               std::to_string(security_level_m) + "\n" + binary_data;
+    }
+    static BeaversTripletGenerationDetails from_string(const std::string& str) {
+        std::istringstream iss(str);
+        std::string randomness_lower_bound, randomness_upper_bound,
+            ab_pair_lower_bound, ab_pair_upper_bound, plaintext_modulus,
+            multiplicative_depth, threshold, total_nodes, security_level;
+        std::getline(iss, randomness_lower_bound);
+        std::getline(iss, randomness_upper_bound);
+        std::getline(iss, ab_pair_lower_bound);
+        std::getline(iss, ab_pair_upper_bound);
+        std::getline(iss, plaintext_modulus);
+        std::getline(iss, multiplicative_depth);
+        std::getline(iss, threshold);
+        std::getline(iss, total_nodes);
+        std::getline(iss, security_level);
+        std::string binary_data = iss.str().substr(iss.tellg());
+        if (binary_data.size() < 16) {
+            throw std::runtime_error("Invalid binary data size");
+        }
+        uint64_t she_public_key_offset, she_sk_share_offset;
+        std::memcpy(&she_public_key_offset, binary_data.data(), 8);
+        std::memcpy(&she_sk_share_offset, binary_data.data() + 8, 8);
+        std::string crypto_context =
+            binary_data.substr(16, she_public_key_offset - 16);
+        std::string serialized_she_public_key = binary_data.substr(
+            she_public_key_offset, she_sk_share_offset - she_public_key_offset);
+        std::string serialized_she_sk_share = binary_data.substr(
+            she_sk_share_offset, binary_data.size() - she_sk_share_offset);
+        auto res = BeaversTripletGenerationDetails(
+            randomness_lower_bound, randomness_upper_bound, ab_pair_lower_bound,
+            ab_pair_upper_bound, plaintext_modulus, multiplicative_depth,
+            std::stoul(threshold), std::stoul(total_nodes),
+            std::stoul(security_level));
+        res.set_serialized_she_public_key(serialized_she_public_key);
+        res.set_serialized_she_sk_share(serialized_she_sk_share);
+        res.set_crypto_context(crypto_context);
+        return res;
+    }
+
+  private:
+    std::string randomness_lower_bound_m;
+    std::string randomness_upper_bound_m;
+    std::string ab_pair_lower_bound_m;
+    std::string ab_pair_upper_bound_m;
+    std::string plaintext_modulus_m;
+    std::string multiplicative_depth_m;
+    size_t threshold_m;
+    size_t total_nodes_m;
+    size_t security_level_m;
+    std::string crypto_context_m;
+    std::string serialized_she_public_key_m;
+    std::string serialized_she_sk_share_m;
+};
+
+class ComparisionPairGenerationDetails {
+  public:
+    ComparisionPairGenerationDetails(const std::string& lower_bound,
+                                     const std::string& upper_bound,
+                                     const std::string& diff_bound)
+        : lower_bound_m(lower_bound), upper_bound_m(upper_bound),
+          diff_bound_m(diff_bound) {}
+
+    const std::string& lower_bound() const { return lower_bound_m; }
+    const std::string& upper_bound() const { return upper_bound_m; }
+    const std::string& diff_bound() const { return diff_bound_m; }
+
+    void set_upper_bound(const std::string& upper_bound) {
+        upper_bound_m = upper_bound;
+    }
+
+    std::string to_string() const {
+        return lower_bound_m + "\n" + upper_bound_m + "\n" + diff_bound_m;
+    }
+    static ComparisionPairGenerationDetails
+    from_string(const std::string& str) {
+        std::istringstream iss(str);
+        std::string lower_bound, upper_bound, diff_bound;
+        std::getline(iss, lower_bound);
+        std::getline(iss, upper_bound);
+        std::getline(iss, diff_bound);
+        return ComparisionPairGenerationDetails(lower_bound, upper_bound,
+                                                diff_bound);
+    }
+
+  private:
+    std::string lower_bound_m;
+    std::string upper_bound_m;
+    std::string diff_bound_m;
+};
 } // namespace CoFHE
 
 #endif

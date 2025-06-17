@@ -40,7 +40,7 @@ class ComparisionPairResponse {
             throw std::runtime_error("Data size mismatch");
         }
         return ComparisionPairResponse(static_cast<Status>(status_int),
-                                   std::move(data));
+                                       std::move(data));
     }
 
   private:
@@ -73,20 +73,21 @@ template <typename CryptoSystem> class ComparisionPairRequestHandler {
     using ResponseType = ComparisionPairResponse;
     using GeneratorType = ComparisionPairGenerator<CryptoSystem>;
     using PublicKey = typename CryptoSystem::PublicKey;
-    ComparisionPairRequestHandler(const CryptoSystem& crypto_system,
-                                  const PublicKey& public_key)
+    ComparisionPairRequestHandler(
+        const CryptoSystem& crypto_system, const PublicKey& public_key,
+        const ComparisionPairGenerationDetails& generation_details)
         : cryptosystem_m(crypto_system), public_key_m(public_key),
-          generator_m(crypto_system, public_key) {}
+          generator_m(crypto_system, public_key, generation_details) {}
 
     ResponseType handle_request(const RequestType& request) {
-        auto pairs = generator_m.generate(request.num_pairs());
-        std::string data = cryptosystem_m.serialize_ciphertext_tensor(pairs);
-        CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0;
-                                                i < pairs.size(); i++) {
-            delete pairs.at(i, 0);
-            delete pairs.at(i, 1);
+        auto res = generator_m.generate(request.num_pairs());
+        auto ser_res = cryptosystem_m.serialize_ciphertext_tensor(res);
+        CoFHE_PARALLEL_FOR_STATIC_SCHEDULE for (size_t i = 0; i < res.size();
+                                                i++) {
+            delete res.at(i, 0);
+            delete res.at(i, 1);
         }
-        return ResponseType(ResponseType::Status::SUCCESS, std::move(data));
+        return ResponseType(ResponseType::Status::SUCCESS, std::move(ser_res));
     }
 
   private:

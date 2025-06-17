@@ -248,7 +248,6 @@ class PartialDecryptionRequestHandler {
         oss << pd << "\n";
         oss << cryptosystem_m.serialize_partial_decryption_result(pd);
         auto str_ss = oss.str();
-        std::cout << "Partial decryption result: " << str_ss << std::endl;
         return PartialDecryptionResponse(
             PartialDecryptionResponse::Status::OK,
             reencryptor_m.reencrypt(pd, request.serialized_public_key()));

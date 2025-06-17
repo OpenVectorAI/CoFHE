@@ -1,8 +1,6 @@
 #ifndef COFHE_NODE_SETUP_NODE_REQUEST_HANDLER_HPP_INCLUDED
 #define COFHE_NODE_SETUP_NODE_REQUEST_HANDLER_HPP_INCLUDED
 
-#include "node/beavers_triplet_request_handler.hpp"
-#include "node/comparision_pair_request_handler.hpp"
 #include "node/join_as_node.hpp"
 #include "node/network_details.hpp"
 #include "node/network_details_request_handler.hpp"
@@ -87,10 +85,10 @@ class SetupNodeRequest {
   public:
     using ResponseType = SetupNodeResponse;
     enum class RequestType {
-        BEAVERS_TRIPLET_REQUEST,
-        COMPARISION_PAIR_REQUEST,
         JOIN_AS_NODE_REQUEST,
         NetworkDetailsRequest,
+        BeaversTripletGenerationDetailsRequest,
+        ComparisionPairGenerationDetailsRequest,
     };
 
     class SetupNodeRequestHeader {
@@ -161,33 +159,36 @@ class SetupNodeRequest {
     std::string data_m;
 };
 
-template <typename CryptoSystem> class SetupNodeRequestHandler {
+template <typename CryptoSystem, typename SHECryptoSystem>
+class SetupNodeRequestHandler {
   public:
     using RequestType = SetupNodeRequest;
     using ResponseType = SetupNodeResponse;
-    SetupNodeRequestHandler(const NodeDetails& self_details,
-                            const CryptoSystemDetails& cryptosystem_details,
-                            const ReencryptorDetails& reencryptor_details)
+    SetupNodeRequestHandler(
+        const NodeDetails& self_details,
+        const CryptoSystemDetails& cryptosystem_details,
+        const ReencryptorDetails& reencryptor_details,
+        const BeaversTripletGenerationDetails& beavers_triplet_details,
+        const ComparisionPairGenerationDetails& comparision_pair_details)
         : join_as_node_handler_m(cryptosystem_details, self_details,
-                                 reencryptor_details),
-          beavers_triplet_handler_m(join_as_node_handler_m.cryptosystem(),
-                                    join_as_node_handler_m.public_key()),
-          comparision_pair_handler_m(join_as_node_handler_m.cryptosystem(),
-                                     join_as_node_handler_m.public_key()) {}
+                                 reencryptor_details, beavers_triplet_details,
+                                 comparision_pair_details) {}
 
     SetupNodeResponse handle_request(const SetupNodeRequest& req) {
         switch (req.type()) {
-        case SetupNodeRequest::RequestType::BEAVERS_TRIPLET_REQUEST: {
-            return handle_beavers_triplet_request(req);
-        }
-        case SetupNodeRequest::RequestType::COMPARISION_PAIR_REQUEST: {
-            return handle_comparision_pair_request(req);
-        }
         case SetupNodeRequest::RequestType::JOIN_AS_NODE_REQUEST: {
             return handle_join_as_node_request(req);
         }
         case SetupNodeRequest::RequestType::NetworkDetailsRequest: {
             return handle_network_details_request(req);
+        }
+        case SetupNodeRequest::RequestType::
+            BeaversTripletGenerationDetailsRequest: {
+            return handle_beavers_triplet_generation_details_request(req);
+        }
+        case SetupNodeRequest::RequestType::
+            ComparisionPairGenerationDetailsRequest: {
+            return handle_comparision_pair_generation_details_request(req);
         }
         default:
             return SetupNodeResponse(SetupNodeResponse::Status::ERROR,
@@ -196,30 +197,9 @@ template <typename CryptoSystem> class SetupNodeRequestHandler {
     }
 
   private:
-    JoinAsNodeRequestHandler<CryptoSystem> join_as_node_handler_m;
-    BeaversTripletRequestHandler<CryptoSystem> beavers_triplet_handler_m;
-    ComparisionPairRequestHandler<CryptoSystem> comparision_pair_handler_m;
+    JoinAsNodeRequestHandler<CryptoSystem, SHECryptoSystem>
+        join_as_node_handler_m;
     NetworkDetailsRequestHandler network_details_handler_m;
-
-    SetupNodeResponse
-    handle_beavers_triplet_request(const SetupNodeRequest& req) {
-        BeaversTripletRequest beavers_triplet_request =
-            BeaversTripletRequest::from_string(req.data());
-        BeaversTripletResponse beavers_triplet_response =
-            beavers_triplet_handler_m.handle_request(beavers_triplet_request);
-        return SetupNodeResponse(SetupNodeResponse::Status::OK,
-                                 beavers_triplet_response.to_string());
-    }
-
-    SetupNodeResponse
-    handle_comparision_pair_request(const SetupNodeRequest& req) {
-        ComparisionPairRequest comparision_pair_request =
-            ComparisionPairRequest::from_string(req.data());
-        ComparisionPairResponse comparision_response =
-            comparision_pair_handler_m.handle_request(comparision_pair_request);
-        return SetupNodeResponse(SetupNodeResponse::Status::OK,
-                                 comparision_response.to_string());
-    }
 
     SetupNodeResponse handle_join_as_node_request(const SetupNodeRequest& req) {
         JoinAsNodeRequest join_as_node_request =
@@ -240,6 +220,22 @@ template <typename CryptoSystem> class SetupNodeRequestHandler {
                 join_as_node_handler_m.network_details());
         return SetupNodeResponse(SetupNodeResponse::Status::OK,
                                  network_details_response.to_string());
+    }
+
+    SetupNodeResponse handle_beavers_triplet_generation_details_request(
+        const SetupNodeRequest& req) {
+        return SetupNodeResponse(
+            SetupNodeResponse::Status::OK,
+            join_as_node_handler_m
+                .beavers_triplet_generation_details(req.data() == "CoFHE_NODE")
+                .to_string());
+    }
+
+    SetupNodeResponse handle_comparision_pair_generation_details_request(
+        const SetupNodeRequest& req) {
+        return SetupNodeResponse(
+            SetupNodeResponse::Status::OK,
+            join_as_node_handler_m.comparision_pair_generation_details().to_string());
     }
 };
 } // namespace CoFHE

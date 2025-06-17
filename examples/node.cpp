@@ -29,22 +29,29 @@ int main(int argc, char const* argv[]) {
         CryptoSystemDetails cs_details{
             CryptoSystemType::CoFHE_CPU, "public_key", 128, 128, 2, 3};
         ReencryptorDetails reencryptor_details(ReencryptorType::RSA, 4096);
-        auto setup_node = make_setup_node<CPUCryptoSystem>(
-            self_details, cs_details, reencryptor_details);
+        BeaversTripletGenerationDetails beavers_triplet_details(
+            "10", "50", "10", "50", "65537", "2", 3,3,128);
+        ComparisionPairGenerationDetails comparision_pair_details("10", "100",
+                                                                  "5");
+        auto setup_node = make_setup_node<CPUCryptoSystem, BFVCryptoSystem>(
+            self_details, cs_details, reencryptor_details,
+            beavers_triplet_details, comparision_pair_details);
         setup_node.run();
     } else if (node_type == "cofhe_node") {
         auto self_details = NodeDetails{argv[2], argv[3], NodeType::CoFHE_NODE};
         auto setup_node_details =
             NodeDetails{argv[4], argv[5], NodeType::SETUP_NODE};
-        auto cofhe_node = make_cofhe_node<CPUCryptoSystem, RSAPKCEncryptor>(
-            self_details, setup_node_details);
+        auto cofhe_node =
+            make_cofhe_node<CPUCryptoSystem, RSAPKCEncryptor, BFVCryptoSystem>(
+                self_details, setup_node_details);
         cofhe_node.run();
     } else if (node_type == "compute_node") {
         auto self_details =
             NodeDetails{argv[2], argv[3], NodeType::COMPUTE_NODE};
         auto setup_node_details =
             NodeDetails{argv[4], argv[5], NodeType::SETUP_NODE};
-        auto compute_node = make_compute_node<CPUCryptoSystem, RSAPKCEncryptor>(
+        auto compute_node = make_compute_node<CPUCryptoSystem, RSAPKCEncryptor,
+                                              BFVCryptoSystem>(
             self_details, setup_node_details);
         compute_node.run();
     } else if (node_type == "client_node") {

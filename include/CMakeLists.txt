@@ -2,7 +2,8 @@ add_library(CoFHE INTERFACE)
 
 find_package(gmp REQUIRED)
 find_package(OpenSSL REQUIRED)
-
+option(BUILD_STATIC "Set to ON to include static versions of the library" ON)
+find_package(OpenFHE CONFIG REQUIRED)
 set(OPENMP TRUE)
 
 file(GLOB_RECURSE CoFHE_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/*.inl")
@@ -21,6 +22,7 @@ target_link_libraries(
     $<INSTALL_INTERFACE:gmp::gmp>
     $<BUILD_INTERFACE:OpenSSL::SSL>
     $<INSTALL_INTERFACE:OpenSSL::SSL>
+    $<BUILD_INTERFACE:${OpenFHE_LIBRARIES}>
 )
 
 target_include_directories(
@@ -29,6 +31,12 @@ target_include_directories(
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<BUILD_INTERFACE:${CoFHE_ROOT_DIRECTORY}>/thirdparty/bicycl/src
     $<BUILD_INTERFACE:${CoFHE_ROOT_DIRECTORY}>/thirdparty/json/include
+    $<BUILD_INTERFACE:${OPENFHE_INCLUDE}>
+    $<BUILD_INTERFACE:${OpenFHE_INCLUDE}>
+    $<BUILD_INTERFACE:${OpenFHE_INCLUDE}/third-party/include>
+    $<BUILD_INTERFACE:${OpenFHE_INCLUDE}/core>
+    $<BUILD_INTERFACE:${OpenFHE_INCLUDE}/pke>
+    $<BUILD_INTERFACE:${OpenFHE_INCLUDE}/binfhe>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 

@@ -262,15 +262,25 @@ class JoinAsNodeRequest {
     std::string port_m;
 };
 
-template <typename CryptoSystem> class JoinAsNodeRequestHandler {
+template <typename CryptoSystem, typename SHECryptoSystem>
+class JoinAsNodeRequestHandler {
   public:
     using RequestType = JoinAsNodeRequest;
     using ResponseType = JoinAsNodeResponse;
 
     JoinAsNodeRequestHandler(const CryptoSystemDetails& cryptosystem_details,
                              const NodeDetails& self_node,
-                             const ReencryptorDetails& reencryptor_details)
-        : cryptosystem_details_m(cryptosystem_details), self_node_m(self_node),
+                             const ReencryptorDetails& reencryptor_details,
+                             const BeaversTripletGenerationDetails&
+                                 beavers_triplet_generation_details,
+                             const ComparisionPairGenerationDetails&
+                                 comparision_pair_generation_details)
+        : cryptosystem_details_m(cryptosystem_details),
+          beavers_triplet_generation_details_m(
+              beavers_triplet_generation_details),
+          comparision_pair_generation_details_m(
+              comparision_pair_generation_details),
+          self_node_m(self_node),
           cryptosystem_m(cryptosystem_details.security_level,
                          cryptosystem_details.k),
           threshold_m(cryptosystem_details.threshold),
@@ -280,36 +290,57 @@ template <typename CryptoSystem> class JoinAsNodeRequestHandler {
 
     JoinAsNodeRequestHandler(JoinAsNodeRequestHandler&& other)
         : cryptosystem_details_m(other.cryptosystem_details_m),
+          beavers_triplet_generation_details_m(
+              other.beavers_triplet_generation_details_m),
+          comparision_pair_generation_details_m(
+              other.comparision_pair_generation_details_m),
           self_node_m(other.self_node_m), cryptosystem_m(other.cryptosystem_m),
           threshold_m(other.threshold_m), total_nodes_m(other.total_nodes_m),
-          public_key_p_m(other.public_key_p_m),
           public_key_m(other.public_key_m),
-          secret_key_shares_m(other.secret_key_shares_m) {
+          secret_key_shares_m(other.secret_key_shares_m),
+          she_public_key_m(other.she_public_key_m),
+          she_secret_shares_m(other.she_secret_shares_m),
+          current_node_m(other.current_node_m),
+          she_current_node_m(other.she_current_node_m),
+          network_details_m(other.network_details_m) {
         std::lock_guard<std::mutex> lock(other.mtx_m);
-        current_node_m = 0;
-        network_details_m = other.network_details_m;
+        public_key_p_m = other.public_key_p_m;
+        she_public_key_p_m = other.she_public_key_p_m;
         other.public_key_p_m = nullptr;
+        other.she_public_key_p_m = nullptr;
     }
 
     JoinAsNodeRequestHandler& operator=(JoinAsNodeRequestHandler&& other) {
         if (this != &other) {
             cryptosystem_details_m = other.cryptosystem_details_m;
+            beavers_triplet_generation_details_m =
+                other.beavers_triplet_generation_details_m;
+            comparision_pair_generation_details_m =
+                other.comparision_pair_generation_details_m;
             self_node_m = other.self_node_m;
             cryptosystem_m = other.cryptosystem_m;
             threshold_m = other.threshold_m;
             total_nodes_m = other.total_nodes_m;
+            std::lock_guard<std::mutex> lock(other.mtx_m);
             public_key_p_m = other.public_key_p_m;
             public_key_m = other.public_key_m;
             secret_key_shares_m = other.secret_key_shares_m;
-            std::lock_guard<std::mutex> lock(other.mtx_m);
-            current_node_m = 0;
+            she_public_key_p_m = other.she_public_key_p_m;
+            she_public_key_m = other.she_public_key_m;
+            she_secret_shares_m = other.she_secret_shares_m;
+            current_node_m = other.current_node_m;
+            she_current_node_m = other.she_current_node_m;
             network_details_m = other.network_details_m;
             other.public_key_p_m = nullptr;
+            other.she_public_key_p_m = nullptr;
         }
         return *this;
     }
 
-    ~JoinAsNodeRequestHandler() { delete public_key_p_m; }
+    ~JoinAsNodeRequestHandler() {
+        delete public_key_p_m;
+        delete she_public_key_p_m;
+    }
 
     JoinAsNodeResponse handle_request(JoinAsNodeRequest req) {
         if (req.type() == JoinAsNodeRequest::RequestType::JOIN_AS_COFHE_NODE) {
@@ -329,23 +360,39 @@ template <typename CryptoSystem> class JoinAsNodeRequestHandler {
         std::lock_guard<std::mutex> lock(mtx_m);
         return network_details_m;
     }
-    typename CryptoSystem::PublicKey& public_key() {
-        std::lock_guard<std::mutex> lock(mtx_m);
-        return *public_key_p_m;
-    }
+    typename CryptoSystem::PublicKey& public_key() { return *public_key_p_m; }
     const typename CryptoSystem::PublicKey& public_key() const {
-        std::lock_guard<std::mutex> lock(mtx_m);
         return *public_key_p_m;
     }
-    CryptoSystem & cryptosystem() {
-        return cryptosystem_m;
+
+    BeaversTripletGenerationDetails
+    beavers_triplet_generation_details(bool is_cofhe_node) const {
+        auto res = beavers_triplet_generation_details_m;
+        if (is_cofhe_node) {
+            if (she_current_node_m < she_secret_shares_m.size()) {
+                std::lock_guard<std::mutex> lock(mtx_m);
+                res.set_serialized_she_sk_share(
+                    she_secret_shares_m[she_current_node_m]);
+                ++she_current_node_m;
+            } else {
+                // pub key conatins error change this
+                res.set_serialized_she_sk_share("No more shares available");
+            }
+        }
+        return res;
     }
-    const CryptoSystem & cryptosystem() const {
-        return cryptosystem_m;
+    ComparisionPairGenerationDetails
+    comparision_pair_generation_details() const {
+        return comparision_pair_generation_details_m;
     }
+
+    CryptoSystem& cryptosystem() { return cryptosystem_m; }
+    const CryptoSystem& cryptosystem() const { return cryptosystem_m; }
 
   private:
     CryptoSystemDetails cryptosystem_details_m;
+    BeaversTripletGenerationDetails beavers_triplet_generation_details_m;
+    ComparisionPairGenerationDetails comparision_pair_generation_details_m;
     NodeDetails self_node_m;
     CryptoSystem cryptosystem_m;
     int threshold_m;
@@ -354,7 +401,11 @@ template <typename CryptoSystem> class JoinAsNodeRequestHandler {
     typename CryptoSystem::PublicKey* public_key_p_m;
     std::string public_key_m;
     std::vector<std::vector<std::string>> secret_key_shares_m;
+    typename SHECryptoSystem::PublicKey* she_public_key_p_m;
+    std::string she_public_key_m;
+    std::vector<std::string> she_secret_shares_m;
     mutable int current_node_m;
+    mutable int she_current_node_m;
     NetworkDetails network_details_m;
 
     void init(const ReencryptorDetails& reencryptor_details) {
@@ -362,6 +413,7 @@ template <typename CryptoSystem> class JoinAsNodeRequestHandler {
         network_details_m.cryptosystem_details() = cryptosystem_details_m;
         network_details_m.nodes().push_back(self_node_m);
         current_node_m = 0;
+        she_current_node_m = 0;
         auto sk = cryptosystem_m.keygen();
         public_key_p_m =
             new typename CryptoSystem::PublicKey(cryptosystem_m.keygen(sk));
@@ -378,6 +430,24 @@ template <typename CryptoSystem> class JoinAsNodeRequestHandler {
             secret_key_shares_m.push_back(secret_key_shares_m_party);
         }
         network_details_m.reencryption_details() = reencryptor_details;
+
+        SHECryptoSystem she_crypto_system(
+            beavers_triplet_generation_details_m.security_level(),
+            beavers_triplet_generation_details_m.plaintext_modulus(),
+            beavers_triplet_generation_details_m.multiplicative_depth(), "");
+        auto [she_pk, she_sk_shares] = she_crypto_system.keygen(
+            beavers_triplet_generation_details_m.threshold(),
+            beavers_triplet_generation_details_m.total_nodes());
+        for (const auto& share : she_sk_shares) {
+            she_secret_shares_m.push_back(
+                she_crypto_system.serialize_secret_key_share(share));
+        }
+        she_public_key_p_m = new typename SHECryptoSystem::PublicKey(she_pk);
+        she_public_key_m = she_crypto_system.serialize_public_key(she_pk);
+        beavers_triplet_generation_details_m.set_serialized_she_public_key(
+            she_public_key_m);
+        beavers_triplet_generation_details_m.set_crypto_context(
+            she_crypto_system.serialize());
     }
 
     JoinAsNodeResponse handle_join_as_cofhe_node(JoinAsNodeRequest req) {

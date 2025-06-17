@@ -116,6 +116,14 @@ inline CPUCryptoSystem::PlainText
 CPUCryptoSystem::make_plaintext(float value) const {
     return map_to_positive(value, scaling_factor, mM, mM_half);
 }
+inline CPUCryptoSystem::PlainText
+CPUCryptoSystem::make_plaintext(const String& value) const {
+    BICYCL::Mpz res(value);
+    if (res.sgn() < 0) {
+        BICYCL::Mpz::add(res, res, hsm2k.cleartext_bound());
+    }
+    return res;
+}
 
 inline float
 CPUCryptoSystem::get_float_from_plaintext(const CPUCryptoSystem::PlainText& pt,
@@ -123,6 +131,18 @@ CPUCryptoSystem::get_float_from_plaintext(const CPUCryptoSystem::PlainText& pt,
                                           unsigned int depth) const {
     return map_back(pt, this->scaling_factor, mM, mM_half, scaling_factor,
                     depth);
+}
+
+inline int CPUCryptoSystem::compare_plaintexts(
+    const CPUCryptoSystem::PlainText& pt1,
+    const CPUCryptoSystem::PlainText& pt2) const {
+    if (pt1.sgn() < pt2.sgn()) {
+        return -1;
+    } else if (pt1.sgn() > pt2.sgn()) {
+        return 1;
+    } else {
+        return BICYCL::Mpz::cmpabs(pt1, pt2);
+    }
 }
 
 inline String CPUCryptoSystem::serialize() const {
@@ -322,7 +342,8 @@ inline String CPUCryptoSystem::serialize_partial_decryption_result(
 }
 
 inline CPUCryptoSystem::PartialDecryptionResult
-CPUCryptoSystem::deserialize_partial_decryption_result(const String& data) const {
+CPUCryptoSystem::deserialize_partial_decryption_result(
+    const String& data) const {
     return deserialize_bicycl_qfi_binary(data);
 }
 

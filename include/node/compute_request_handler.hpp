@@ -13,20 +13,27 @@
 
 namespace CoFHE {
 
-template <typename CryptoSystem, typename PKCEncryptor>
+template <typename CryptoSystem, typename PKCEncryptor,
+          typename SHECryptoSystem>
 class ComputeRequestHandler {
   public:
     using RequestType = ComputeRequest;
     using ResponseType = ComputeResponse;
     using CipherText = typename CryptoSystem::CipherText;
     using PlainText = typename CryptoSystem::PlainText;
-    ComputeRequestHandler(const NetworkDetails& nd)
+    ComputeRequestHandler(const NetworkDetails& nd,
+                          const BeaversTripletGenerationDetails&
+                              beavers_triplet_generation_details,
+                          const ComparisionPairGenerationDetails&
+                              comparision_pair_generation_details)
         : nd_m(nd), cryptosystem_m(nd_m.cryptosystem_details().security_level,
                                    nd_m.cryptosystem_details().k,
                                    nd_m.cryptosystem_details().N),
           public_key_m(cryptosystem_m.deserialize_public_key(
               nd_m.cryptosystem_details().public_key)),
-          smpc_client_m(nd_m), ciphertext_multiplier_m(smpc_client_m),
+          smpc_client_m(nd_m, beavers_triplet_generation_details,
+                        comparision_pair_generation_details),
+          ciphertext_multiplier_m(smpc_client_m),
           ciphertext_comparator_m(smpc_client_m) {}
 
     ComputeRequestHandler(ComputeRequestHandler&& other)
@@ -43,11 +50,11 @@ class ComputeRequestHandler {
             public_key_m = other.public_key_m;
             smpc_client_m = std::move(other.smpc_client_m);
             ciphertext_multiplier_m =
-                SMPCCipherTextMultiplier<CryptoSystem, PKCEncryptor>(
-                    smpc_client_m);
+                SMPCCipherTextMultiplier<CryptoSystem, PKCEncryptor,
+                                         SHECryptoSystem>(smpc_client_m);
             ciphertext_comparator_m =
-                SMPCCipherTextComparator<CryptoSystem, PKCEncryptor>(
-                    smpc_client_m);
+                SMPCCipherTextComparator<CryptoSystem, PKCEncryptor,
+                                         SHECryptoSystem>(smpc_client_m);
         }
         return *this;
     }
@@ -74,10 +81,10 @@ class ComputeRequestHandler {
     NetworkDetails nd_m;
     CryptoSystem cryptosystem_m;
     typename CryptoSystem::PublicKey public_key_m;
-    SMPCClient<CryptoSystem, PKCEncryptor> smpc_client_m;
-    SMPCCipherTextMultiplier<CryptoSystem, PKCEncryptor>
+    SMPCClient<CryptoSystem, PKCEncryptor, SHECryptoSystem> smpc_client_m;
+    SMPCCipherTextMultiplier<CryptoSystem, PKCEncryptor, SHECryptoSystem>
         ciphertext_multiplier_m;
-    SMPCCipherTextComparator<CryptoSystem, PKCEncryptor>
+    SMPCCipherTextComparator<CryptoSystem, PKCEncryptor, SHECryptoSystem>
         ciphertext_comparator_m;
 
     ComputeResponse handle_unary_operation(
@@ -1996,20 +2003,13 @@ class ComputeRequestHandler {
 
         switch (operation.operands()[0].data_type()) {
         case ComputeRequest::DataType::SINGLE: {
-            std::cout << "Reencrypting single" << std::endl;
-            std::cout << operation.operands()[0].data() << std::endl;
-            std::cout << operation.operands()[1].data() << std::endl;
             auto ct = cryptosystem_m.deserialize_ciphertext(
                 operation.operands()[0].data());
-            std::cout << ct.c1() << std::endl;
-            std::cout << ct.c2() << std::endl;
             auto res = ComputeResponse(
                 ComputeResponse::Status::OK,
                 smpc_client_m.reencrypt(cryptosystem_m.deserialize_ciphertext(
                                             operation.operands()[0].data()),
                                         operation.operands()[1].data()));
-            std::cout << res.data() << std::endl;
-            std::cout << "Reencrypted single" << std::endl;
             return res;
         }
         case ComputeRequest::DataType::TENSOR: {

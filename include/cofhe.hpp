@@ -12,6 +12,8 @@
 #include "node/client_node.hpp"
 #include "node/compute_request_response.hpp"
 #include "utils/binary_cryptosystem.hpp"
+#include "utils/bfv.hpp"
+#include "utils/rsa.hpp"
 
 namespace CoFHE
 {
@@ -50,7 +52,9 @@ namespace CoFHE
     {cs.negate_ciphertext(pk, ct)} -> std::same_as<CipherTextImpl>;
     {cs.negate_ciphertext_tensor(pk, Tensor<CipherTextImpl>{})} -> std::same_as<Tensor<CipherTextImpl>>;
     { cs.make_plaintext(0.0f) } -> std::same_as<PlainTextImpl>;
+    { cs.make_plaintext("0.0") } -> std::same_as<PlainTextImpl>; 
     {cs.get_float_from_plaintext(pt)} -> std::same_as<float>;
+    {cs.compare_plaintexts(pt, pt)} -> std::same_as<int>;
     { cs.serialize() } -> std::same_as<String>;
     { cs.serialize_secret_key(sk) } -> std::same_as<String>;
     { cs.serialize_secret_key_share(sks) } -> std::same_as<String>;

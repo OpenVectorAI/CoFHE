@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "node/beavers_triplet_request_handler.hpp"
+#include "node/comparision_pair_request_handler.hpp"
 #include "node/network_details.hpp"
 #include "node/partial_decryption_request_handler.hpp"
 #include "node/reencryptor_factory.hpp"
@@ -87,6 +89,8 @@ class CoFHENodeRequest {
     enum class RequestType {
         PartialDecryption,
         SMPC,
+        BEAVERS_TRIPLET_REQUEST,
+        COMPARISION_PAIR_REQUEST,
     };
 
     class CoFHENodeRequestHeader {
@@ -153,13 +157,18 @@ class CoFHENodeRequest {
     std::string data_m;
 };
 
-template <typename CryptoSystem, typename PKCEncryptor>
+template <typename CryptoSystem, typename PKCEncryptor,
+          typename SHECryptosystem>
 class CoFHENodeRequestHandler {
   public:
     using RequestType = CoFHENodeRequest;
     using ResponseType = CoFHENodeResponse;
     using SecretKeyShare = typename CryptoSystem::SecretKeyShare;
-    CoFHENodeRequestHandler(const NetworkDetails& nd)
+    CoFHENodeRequestHandler(const NetworkDetails& nd,
+                            const BeaversTripletGenerationDetails&
+                                beavers_triplet_generation_details,
+                            const ComparisionPairGenerationDetails&
+                                comparision_pair_generation_details)
         : nd_m(nd), cryptosystem_m(nd.cryptosystem_details().security_level,
                                    nd.cryptosystem_details().k,
                                    nd.cryptosystem_details().N),
@@ -168,7 +177,11 @@ class CoFHENodeRequestHandler {
           sk_shares_m(),
           partial_decryption_handler_m(
               cryptosystem_m, sk_shares_m,
-              make_reencryptor<PKCEncryptor>(nd.reencryption_details())) {
+              make_reencryptor<PKCEncryptor>(nd.reencryption_details())),
+          beavers_triplet_handler_m(cryptosystem_m, pk_m,
+                                    beavers_triplet_generation_details),
+          comparision_pair_handler_m(cryptosystem_m, pk_m,
+                                     comparision_pair_generation_details) {
         for (auto& sk_share : nd.secret_key_shares()) {
             sk_shares_m.push_back(
                 cryptosystem_m.deserialize_secret_key_share(sk_share));
@@ -184,6 +197,12 @@ class CoFHENodeRequestHandler {
         case CoFHENodeRequest::RequestType::SMPC: {
             return handle_smpc_request(request);
         }
+        case CoFHENodeRequest::RequestType::BEAVERS_TRIPLET_REQUEST: {
+            return handle_beavers_triplet_generation_request(request);
+        }
+        case CoFHENodeRequest::RequestType::COMPARISION_PAIR_REQUEST: {
+            return handle_comparision_pair_generation_request(request);
+        }
         default: {
             return CoFHENodeResponse(CoFHENodeResponse::Status::ERROR,
                                      "Invalid request type");
@@ -198,6 +217,9 @@ class CoFHENodeRequestHandler {
     std::vector<SecretKeyShare> sk_shares_m;
     PartialDecryptionRequestHandler<CryptoSystem, PKCEncryptor>
         partial_decryption_handler_m;
+    BeaversTripletRequestHandler<CryptoSystem, SHECryptosystem>
+        beavers_triplet_handler_m;
+    ComparisionPairRequestHandler<CryptoSystem> comparision_pair_handler_m;
 
     CoFHENodeResponse
     handle_partial_decryption_request(const CoFHENodeRequest& request) {
@@ -213,6 +235,25 @@ class CoFHENodeRequestHandler {
     CoFHENodeResponse handle_smpc_request(const CoFHENodeRequest& request) {
         return CoFHENodeResponse(CoFHENodeResponse::Status::ERROR,
                                  "Not implemented");
+    }
+
+    CoFHENodeResponse
+    handle_beavers_triplet_generation_request(const CoFHENodeRequest& request) {
+        auto beavers_triplet_request =
+            BeaversTripletRequest::from_string(request.data());
+        auto beavers_triplet_response =
+            beavers_triplet_handler_m.handle_request(beavers_triplet_request);
+        return CoFHENodeResponse(CoFHENodeResponse::Status::OK,
+                                 beavers_triplet_response.to_string());
+    }
+    CoFHENodeResponse handle_comparision_pair_generation_request(
+        const CoFHENodeRequest& request) {
+        auto comparision_pair_request =
+            ComparisionPairRequest::from_string(request.data());
+        auto comparision_pair_response =
+            comparision_pair_handler_m.handle_request(comparision_pair_request);
+        return CoFHENodeResponse(CoFHENodeResponse::Status::OK,
+                                 comparision_pair_response.to_string());
     }
 };
 
